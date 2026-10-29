@@ -1,0 +1,166 @@
+.log-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.log-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.log-search {
+  width: 180px;
+  padding: 2px 6px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+}
+
+.log-scroll {
+  flex: 1;
+  overflow: auto;
+  background: var(--vscode-terminal-background, var(--vscode-editor-background));
+  color: var(--vscode-terminal-foreground, var(--vscode-foreground));
+}
+
+.log-lines {
+  position: relative;
+  min-width: max-content;
+}
+
+.log-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 18px;
+  line-height: 18px;
+  white-space: pre;
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+}
+
+.log-line.current {
+  background: var(--vscode-editor-findMatchHighlightBackground);
+}
+
+.log-section {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  white-space: pre;
+}
+
+.b {
+  font-weight: bold;
+}
+.i {
+  font-style: italic;
+}
+.u {
+  text-decoration: underline;
+}
+
+.fg-ansi-0 {
+  color: var(--vscode-terminal-ansiBlack);
+}
+.fg-ansi-1 {
+  color: var(--vscode-terminal-ansiRed);
+}
+.fg-ansi-2 {
+  color: var(--vscode-terminal-ansiGreen);
+}
+.fg-ansi-3 {
+  color: var(--vscode-terminal-ansiYellow);
+}
+.fg-ansi-4 {
+  color: var(--vscode-terminal-ansiBlue);
+}
+.fg-ansi-5 {
+  color: var(--vscode-terminal-ansiMagenta);
+}
+.fg-ansi-6 {
+  color: var(--vscode-terminal-ansiCyan);
+}
+.fg-ansi-7 {
+  color: var(--vscode-terminal-ansiWhite);
+}
+.fg-ansi-8 {
+  color: var(--vscode-terminal-ansiBrightBlack);
+}
+.fg-ansi-9 {
+  color: var(--vscode-terminal-ansiBrightRed);
+}
+.fg-ansi-10 {
+  color: var(--vscode-terminal-ansiBrightGreen);
+}
+.fg-ansi-11 {
+  color: var(--vscode-terminal-ansiBrightYellow);
+}
+.fg-ansi-12 {
+  color: var(--vscode-terminal-ansiBrightBlue);
+}
+.fg-ansi-13 {
+  color: var(--vscode-terminal-ansiBrightMagenta);
+}
+.fg-ansi-14 {
+  color: var(--vscode-terminal-ansiBrightCyan);
+}
+.fg-ansi-15 {
+  color: var(--vscode-terminal-ansiBrightWhite);
+}
+.bg-ansi-0 {
+  background: var(--vscode-terminal-ansiBlack);
+}
+.bg-ansi-1 {
+  background: var(--vscode-terminal-ansiRed);
+}
+.bg-ansi-2 {
+  background: var(--vscode-terminal-ansiGreen);
+}
+.bg-ansi-3 {
+  background: var(--vscode-terminal-ansiYellow);
+}
+.bg-ansi-4 {
+  background: var(--vscode-terminal-ansiBlue);
+}
+.bg-ansi-5 {
+  background: var(--vscode-terminal-ansiMagenta);
+}
+.bg-ansi-6 {
+  background: var(--vscode-terminal-ansiCyan);
+}
+.bg-ansi-7 {
+  background: var(--vscode-terminal-ansiWhite);
+}
+.bg-ansi-8 {
+  background: var(--vscode-terminal-ansiBrightBlack);
+}
+.bg-ansi-9 {
+  background: var(--vscode-terminal-ansiBrightRed);
+}
+.bg-ansi-10 {
+  background: var(--vscode-terminal-ansiBrightGreen);
+}
+.bg-ansi-11 {
+  background: var(--vscode-terminal-ansiBrightYellow);
+}
+.bg-ansi-12 {
+  background: var(--vscode-terminal-ansiBrightBlue);
+}
+.bg-ansi-13 {
+  background: var(--vscode-terminal-ansiBrightMagenta);
+}
+.bg-ansi-14 {
+  background: var(--vscode-terminal-ansiBrightCyan);
+}
+.bg-ansi-15 {
+  background: var(--vscode-terminal-ansiBrightWhite);
+}

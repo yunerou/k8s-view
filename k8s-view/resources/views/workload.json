@@ -1,0 +1,484 @@
+{
+  "$schema": "../../schemas/k8s-view.schema.json",
+  "version": 1,
+  "views": [
+    {
+      "id": "workload",
+      "title": "Workload",
+      "icon": "layers",
+      "order": 1,
+      "sections": [
+        {
+          "id": "deployments",
+          "title": "Deployments",
+          "icon": "rocket",
+          "resources": [{ "group": "apps", "kind": "Deployment" }],
+          "status": { "preset": "replicas" },
+          "columns": [
+            { "title": "Ready", "template": "${$.status.readyReplicas|default:0}/${$.spec.replicas|default:1}" },
+            { "title": "Up-to-date", "path": "$.status.updatedReplicas", "default": "0" },
+            { "title": "Available", "path": "$.status.availableReplicas", "default": "0" },
+            { "title": "Images", "path": "$.spec.template.spec.containers[*].image", "width": 280 },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "replicasets",
+              "relation": { "type": "ownerRef", "group": "apps", "kind": "ReplicaSet" },
+              // Old ReplicaSets (0 replicas) are hidden.
+              "filter": { "path": "$.spec.replicas", "op": "neq", "value": 0 },
+              "children": [
+                {
+                  "id": "pods",
+                  "relation": { "type": "ownerRef", "kind": "Pod" },
+                  "children": [
+                    {
+                      "id": "containers",
+                      "relation": {
+                        "type": "field",
+                        "items": "$.spec.containers[*]",
+                        "label": "${$.name}",
+                        "description": "${$.image}",
+                        "icon": "package"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "statefulsets",
+          "title": "StatefulSets",
+          "icon": "database",
+          "resources": [{ "group": "apps", "kind": "StatefulSet" }],
+          "status": { "preset": "replicas" },
+          "columns": [
+            { "title": "Ready", "template": "${$.status.readyReplicas|default:0}/${$.spec.replicas|default:1}" },
+            { "title": "Images", "path": "$.spec.template.spec.containers[*].image", "width": 280 },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [{ "id": "pods", "relation": { "type": "ownerRef", "kind": "Pod" } }]
+        },
+        {
+          "id": "daemonsets",
+          "title": "DaemonSets",
+          "icon": "server",
+          "resources": [{ "group": "apps", "kind": "DaemonSet" }],
+          "status": { "preset": "replicas" },
+          "columns": [
+            { "title": "Desired", "path": "$.status.desiredNumberScheduled", "default": "0" },
+            { "title": "Ready", "path": "$.status.numberReady", "default": "0" },
+            { "title": "Node selector", "path": "$.spec.template.spec.nodeSelector", "render": "labels" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [{ "id": "pods", "relation": { "type": "ownerRef", "kind": "Pod" } }]
+        },
+        {
+          "id": "replicasets",
+          "title": "ReplicaSets",
+          "icon": "copy",
+          "resources": [{ "group": "apps", "kind": "ReplicaSet" }],
+          "filter": { "path": "$.spec.replicas", "op": "neq", "value": 0 },
+          "status": { "preset": "replicas" },
+          "columns": [
+            { "title": "Desired", "path": "$.spec.replicas", "default": "0" },
+            { "title": "Ready", "path": "$.status.readyReplicas", "default": "0" },
+            { "title": "Owner", "path": "$.metadata.ownerReferences[*].name" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [{ "id": "pods", "relation": { "type": "ownerRef", "kind": "Pod" } }]
+        },
+        {
+          "id": "pods",
+          "title": "Pods",
+          "icon": "symbol-class",
+          "resources": [{ "kind": "Pod" }],
+          "status": { "preset": "pod" },
+          "columns": [
+            { "title": "Status", "path": "$.status.phase", "render": "status" },
+            {
+              "title": "Ready",
+              "template": "${$.status.containerStatuses[?(@.ready==true)]|count}/${$.spec.containers|count}"
+            },
+            { "title": "Restarts", "template": "${$.status.containerStatuses[*].restartCount|sum}" },
+            {
+              "id": "cpu-used",
+              "title": "CPU Used",
+              "path": "$.resourceMetrics.cpu.used",
+              "render": "cpu",
+              "default": "-"
+            },
+            {
+              "id": "cpu-percent",
+              "title": "CPU Used/Req %",
+              "path": "$.resourceMetrics.cpu.percent",
+              "render": "percentage",
+              "default": "-"
+            },
+            {
+              "id": "cpu-request",
+              "title": "CPU Request",
+              "path": "$.resourceMetrics.cpu.request",
+              "render": "cpu",
+              "default": "-"
+            },
+            {
+              "id": "cpu-limit",
+              "title": "CPU Limit",
+              "path": "$.resourceMetrics.cpu.limit",
+              "render": "cpu",
+              "default": "-"
+            },
+            {
+              "id": "memory-used",
+              "title": "Mem Used",
+              "path": "$.resourceMetrics.memory.used",
+              "render": "memory",
+              "default": "-"
+            },
+            {
+              "id": "memory-percent",
+              "title": "Mem Used/Req %",
+              "path": "$.resourceMetrics.memory.percent",
+              "render": "percentage",
+              "default": "-"
+            },
+            {
+              "id": "memory-request",
+              "title": "Mem Request",
+              "path": "$.resourceMetrics.memory.request",
+              "render": "memory",
+              "default": "-"
+            },
+            {
+              "id": "memory-limit",
+              "title": "Mem Limit",
+              "path": "$.resourceMetrics.memory.limit",
+              "render": "memory",
+              "default": "-"
+            },
+            { "title": "Node", "path": "$.spec.nodeName" },
+            { "title": "IP", "path": "$.status.podIP" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "containers",
+              "relation": {
+                "type": "field",
+                "items": "$.spec.containers[*]",
+                "label": "${$.name}",
+                "description": "${$.image}",
+                "icon": "package"
+              }
+            }
+          ]
+        },
+        {
+          "id": "cronjobs",
+          "title": "CronJobs",
+          "icon": "watch",
+          "resources": [
+            {
+              "group": "batch",
+              "kind": "CronJob"
+            }
+          ],
+          "description": "${$.spec.schedule}",
+          "columns": [
+            {
+              "title": "Schedule",
+              "path": "$.spec.schedule"
+            },
+            {
+              "title": "Suspend",
+              "path": "$.spec.suspend",
+              "render": "boolean",
+              "default": "No"
+            },
+            {
+              "title": "Active",
+              "path": "$.status.active",
+              "render": "count",
+              "default": "0"
+            },
+            {
+              "title": "Last schedule",
+              "path": "$.status.lastScheduleTime",
+              "render": "age"
+            },
+            {
+              "title": "Age",
+              "path": "$.metadata.creationTimestamp",
+              "render": "age"
+            }
+          ],
+          "children": [
+            {
+              "id": "jobs",
+              "relation": {
+                "type": "ownerRef",
+                "group": "batch",
+                "kind": "Job"
+              },
+              "children": [
+                {
+                  "id": "pods",
+                  "relation": {
+                    "type": "ownerRef",
+                    "kind": "Pod"
+                  },
+                  "status": {
+                    "rules": [
+                      {
+                        "when": {
+                          "path": "$.status.phase",
+                          "op": "eq",
+                          "value": "Succeeded"
+                        },
+                        "level": "ok",
+                        "summary": "Complete",
+                        "icon": "circle-outline",
+                        "color": "charts.blue"
+                      },
+                      {
+                        "when": {
+                          "path": "$.status.phase",
+                          "op": "eq",
+                          "value": "Failed"
+                        },
+                        "level": "error",
+                        "summary": "Failed",
+                        "icon": "circle-outline",
+                        "color": "charts.red"
+                      },
+                      {
+                        "when": {
+                          "path": "$.status.phase",
+                          "op": "eq",
+                          "value": "Running"
+                        },
+                        "level": "ok",
+                        "summary": "Running",
+                        "icon": "circle-outline",
+                        "color": "charts.green"
+                      },
+                      {
+                        "when": {
+                          "path": "$.metadata.name",
+                          "op": "exists"
+                        },
+                        "level": "warning",
+                        "summary": "Pending / Unknown",
+                        "icon": "circle-outline",
+                        "color": "charts.yellow"
+                      }
+                    ],
+                    "default": "warning"
+                  }
+                }
+              ],
+              "status": {
+                "rules": [
+                  {
+                    "when": {
+                      "path": "$.status.conditions[?(@.type=='Complete')].status",
+                      "op": "eq",
+                      "value": "True"
+                    },
+                    "level": "ok",
+                    "summary": "Complete",
+                    "icon": "circle-outline",
+                    "color": "charts.blue"
+                  },
+                  {
+                    "when": {
+                      "path": "$.status.conditions[?(@.type=='Failed')].status",
+                      "op": "eq",
+                      "value": "True"
+                    },
+                    "level": "error",
+                    "summary": "Failed",
+                    "icon": "circle-outline",
+                    "color": "charts.red"
+                  },
+                  {
+                    "when": {
+                      "path": "$.status.active",
+                      "op": "regex",
+                      "value": "^[1-9][0-9]*$"
+                    },
+                    "level": "ok",
+                    "summary": "Running",
+                    "icon": "circle-outline",
+                    "color": "charts.green"
+                  },
+                  {
+                    "when": {
+                      "path": "$.metadata.name",
+                      "op": "exists"
+                    },
+                    "level": "warning",
+                    "summary": "Pending / Suspended",
+                    "icon": "circle-outline",
+                    "color": "charts.yellow"
+                  }
+                ],
+                "default": "warning"
+              }
+            }
+          ]
+        },
+        {
+          "id": "jobs",
+          "title": "Jobs",
+          "icon": "run",
+          "resources": [
+            {
+              "group": "batch",
+              "kind": "Job"
+            }
+          ],
+          "filter": {
+            "op": "notOwnedBy",
+            "value": "CronJob"
+          },
+          "status": {
+            "rules": [
+              {
+                "when": {
+                  "path": "$.status.conditions[?(@.type=='Complete')].status",
+                  "op": "eq",
+                  "value": "True"
+                },
+                "level": "ok",
+                "summary": "Complete",
+                "icon": "circle-outline",
+                "color": "charts.blue"
+              },
+              {
+                "when": {
+                  "path": "$.status.conditions[?(@.type=='Failed')].status",
+                  "op": "eq",
+                  "value": "True"
+                },
+                "level": "error",
+                "summary": "Failed",
+                "icon": "circle-outline",
+                "color": "charts.red"
+              },
+              {
+                "when": {
+                  "path": "$.status.active",
+                  "op": "regex",
+                  "value": "^[1-9][0-9]*$"
+                },
+                "level": "ok",
+                "summary": "Running",
+                "icon": "circle-outline",
+                "color": "charts.green"
+              },
+              {
+                "when": {
+                  "path": "$.metadata.name",
+                  "op": "exists"
+                },
+                "level": "warning",
+                "summary": "Pending / Suspended",
+                "icon": "circle-outline",
+                "color": "charts.yellow"
+              }
+            ],
+            "default": "warning"
+          },
+          "columns": [
+            {
+              "title": "Completions",
+              "template": "${$.status.succeeded|default:0}/${$.spec.completions|default:1}"
+            },
+            {
+              "title": "Status",
+              "path": "$.status.conditions[?(@.status=='True')].type",
+              "render": "status",
+              "default": "Running"
+            },
+            {
+              "title": "Started",
+              "path": "$.status.startTime",
+              "render": "age"
+            },
+            {
+              "title": "Finished",
+              "path": "$.status.completionTime",
+              "render": "age"
+            },
+            {
+              "title": "Age",
+              "path": "$.metadata.creationTimestamp",
+              "render": "age"
+            }
+          ],
+          "children": [
+            {
+              "id": "pods",
+              "relation": {
+                "type": "ownerRef",
+                "kind": "Pod"
+              },
+              "status": {
+                "rules": [
+                  {
+                    "when": {
+                      "path": "$.status.phase",
+                      "op": "eq",
+                      "value": "Succeeded"
+                    },
+                    "level": "ok",
+                    "summary": "Complete",
+                    "icon": "circle-outline",
+                    "color": "charts.blue"
+                  },
+                  {
+                    "when": {
+                      "path": "$.status.phase",
+                      "op": "eq",
+                      "value": "Failed"
+                    },
+                    "level": "error",
+                    "summary": "Failed",
+                    "icon": "circle-outline",
+                    "color": "charts.red"
+                  },
+                  {
+                    "when": {
+                      "path": "$.status.phase",
+                      "op": "eq",
+                      "value": "Running"
+                    },
+                    "level": "ok",
+                    "summary": "Running",
+                    "icon": "circle-outline",
+                    "color": "charts.green"
+                  },
+                  {
+                    "when": {
+                      "path": "$.metadata.name",
+                      "op": "exists"
+                    },
+                    "level": "warning",
+                    "summary": "Pending / Unknown",
+                    "icon": "circle-outline",
+                    "color": "charts.yellow"
+                  }
+                ],
+                "default": "warning"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

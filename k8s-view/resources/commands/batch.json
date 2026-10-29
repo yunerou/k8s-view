@@ -1,0 +1,210 @@
+{
+  "$schema": "../../schemas/k8s-view.schema.json",
+  "version": 1,
+  "commands": [
+    {
+      "id": "batch.copyNames",
+      "title": "Copy names",
+      "group": "Batch Commands",
+      "icon": "copy",
+      "match": [
+        {
+          "group": "*",
+          "kind": "*"
+        }
+      ],
+      "dangerous": false,
+      "refreshAfter": false,
+      "run": {
+        "type": "batch",
+        "operation": "copyNames"
+      }
+    },
+    {
+      "id": "batch.delete",
+      "title": "Delete",
+      "group": "Batch Commands",
+      "icon": "trash",
+      "match": [
+        {
+          "group": "",
+          "kind": "Pod"
+        },
+        {
+          "group": "batch",
+          "kind": "Job"
+        }
+      ],
+      "dangerous": true,
+      "refreshAfter": true,
+      "run": {
+        "type": "batch",
+        "operation": "delete"
+      },
+      "confirm": "Delete all selected resources on ${context}?"
+    },
+    {
+      "id": "batch.restart",
+      "title": "Rollout restart",
+      "group": "Batch Commands",
+      "icon": "debug-restart",
+      "match": [
+        {
+          "group": "apps",
+          "kind": "Deployment"
+        },
+        {
+          "group": "apps",
+          "kind": "StatefulSet"
+        },
+        {
+          "group": "apps",
+          "kind": "DaemonSet"
+        }
+      ],
+      "dangerous": true,
+      "refreshAfter": true,
+      "run": {
+        "type": "batch",
+        "operation": "restart"
+      }
+    },
+    {
+      "id": "batch.scale",
+      "title": "Scale\u2026",
+      "group": "Batch Commands",
+      "icon": "arrow-both",
+      "match": [
+        {
+          "group": "apps",
+          "kind": "Deployment"
+        },
+        {
+          "group": "apps",
+          "kind": "StatefulSet"
+        },
+        {
+          "group": "apps",
+          "kind": "ReplicaSet"
+        },
+        {
+          "group": "",
+          "kind": "ReplicationController"
+        }
+      ],
+      "dangerous": true,
+      "refreshAfter": true,
+      "run": {
+        "type": "batch",
+        "operation": "scale",
+        "replicas": "${input:replicas}"
+      },
+      "inputs": [
+        {
+          "id": "replicas",
+          "type": "prompt",
+          "title": "Replicas for all selected resources",
+          "pattern": "^\\d+$"
+        }
+      ]
+    },
+    {
+      "id": "batch.suspend",
+      "title": "Suspend",
+      "group": "Batch Commands",
+      "icon": "debug-pause",
+      "match": [
+        {
+          "group": "batch",
+          "kind": "CronJob"
+        },
+        {
+          "group": "batch",
+          "kind": "Job"
+        }
+      ],
+      "dangerous": true,
+      "refreshAfter": true,
+      "run": {
+        "type": "batch",
+        "operation": "suspend"
+      }
+    },
+    {
+      "id": "batch.resume",
+      "title": "Resume",
+      "group": "Batch Commands",
+      "icon": "debug-continue",
+      "match": [
+        {
+          "group": "batch",
+          "kind": "CronJob"
+        },
+        {
+          "group": "batch",
+          "kind": "Job"
+        }
+      ],
+      "dangerous": true,
+      "refreshAfter": true,
+      "run": {
+        "type": "batch",
+        "operation": "resume"
+      }
+    },
+    {
+      "id": "batch.trigger",
+      "title": "Trigger now",
+      "group": "Batch Commands",
+      "icon": "play",
+      "match": [
+        {
+          "group": "batch",
+          "kind": "CronJob"
+        }
+      ],
+      "dangerous": true,
+      "refreshAfter": true,
+      "run": {
+        "type": "batch",
+        "operation": "trigger"
+      }
+    },
+    {
+      "id": "batch.cordon",
+      "title": "Cordon",
+      "group": "Batch Commands",
+      "icon": "debug-pause",
+      "match": [
+        {
+          "group": "",
+          "kind": "Node"
+        }
+      ],
+      "dangerous": true,
+      "refreshAfter": true,
+      "run": {
+        "type": "batch",
+        "operation": "cordon"
+      }
+    },
+    {
+      "id": "batch.uncordon",
+      "title": "Uncordon",
+      "group": "Batch Commands",
+      "icon": "debug-continue",
+      "match": [
+        {
+          "group": "",
+          "kind": "Node"
+        }
+      ],
+      "dangerous": true,
+      "refreshAfter": true,
+      "run": {
+        "type": "batch",
+        "operation": "uncordon"
+      }
+    }
+  ]
+}

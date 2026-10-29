@@ -1,0 +1,19 @@
+{
+  // Workspace view used in integration tests
+  "version": 1,
+  "views": [
+    {
+      "id": "team",
+      "title": "Team",
+      "sections": [
+        {
+          "id": "deployments",
+          "title": "Payments deployments",
+          "resources": [{ "group": "apps", "kind": "Deployment" }],
+          "filter": { "path": "$.metadata.labels.team", "op": "eq", "value": "payments" },
+          "columns": [{ "title": "Ready", "template": "${$.status.readyReplicas|default:0}/${$.spec.replicas}" }]
+        }
+      ]
+    }
+  ]
+}

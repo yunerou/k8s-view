@@ -1,0 +1,295 @@
+{
+  "$schema": "../../schemas/k8s-view.schema.json",
+  "version": 1,
+  "views": [
+    {
+      "id": "volume",
+      "title": "Volume",
+      "icon": "database",
+      // ngay sau Config
+      "order": 3.5,
+      "sections": [
+        {
+          "id": "pvcs",
+          "title": "PersistentVolumeClaims",
+          "icon": "database",
+          "resources": [{ "kind": "PersistentVolumeClaim" }],
+          "status": {
+            "rules": [
+              {
+                "when": { "path": "$.metadata.deletionTimestamp", "op": "exists" },
+                "level": "progress",
+                "summary": "Terminating"
+              },
+              {
+                "when": { "path": "$.status.phase", "op": "eq", "value": "Lost" },
+                "level": "error",
+                "summary": "Lost"
+              },
+              {
+                "when": { "path": "$.status.phase", "op": "eq", "value": "Pending" },
+                "level": "progress",
+                "summary": "Pending"
+              },
+              {
+                "when": {
+                  "path": "$.status.conditions[?(@.type=='Resizing' || @.type=='FileSystemResizePending')].status",
+                  "op": "eq",
+                  "value": "True"
+                },
+                "level": "progress",
+                "summary": "Resizing"
+              },
+              { "when": { "path": "$.status.phase", "op": "eq", "value": "Bound" }, "level": "ok" }
+            ],
+            "default": "unknown"
+          },
+          "description": "${$.spec.resources.requests.storage} · ${$.spec.storageClassName}",
+          "columns": [
+            { "title": "Status", "path": "$.status.phase", "render": "status" },
+            { "title": "Volume", "path": "$.spec.volumeName" },
+            { "title": "Capacity", "path": "$.status.capacity.storage", "render": "quantity" },
+            { "title": "Requested", "path": "$.spec.resources.requests.storage", "render": "quantity", "hidden": true },
+            { "title": "Access modes", "path": "$.spec.accessModes[*]", "render": "badge" },
+            { "title": "StorageClass", "path": "$.spec.storageClassName", "default": "<none>" },
+            { "title": "Volume mode", "path": "$.spec.volumeMode", "default": "Filesystem", "hidden": true },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "volume",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec",
+                "name": "$.volumeName",
+                "group": { "default": "" },
+                "kind": { "default": "PersistentVolume" }
+              }
+            },
+            {
+              "id": "storageclass",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec",
+                "name": "$.storageClassName",
+                "group": { "default": "storage.k8s.io" },
+                "kind": { "default": "StorageClass" }
+              }
+            },
+            {
+              // Pods mounting the PVC
+              "id": "pods",
+              "title": "Used by",
+              "relation": {
+                "type": "reverseFieldRef",
+                "group": "",
+                "kind": "Pod",
+                "items": "$.spec.volumes[*].persistentVolumeClaim.claimName",
+                "match": { "name": "${name}" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "pvs",
+          "title": "PersistentVolumes",
+          "icon": "server",
+          "resources": [{ "kind": "PersistentVolume" }],
+          "status": {
+            "rules": [
+              {
+                "when": { "path": "$.metadata.deletionTimestamp", "op": "exists" },
+                "level": "progress",
+                "summary": "Terminating"
+              },
+              {
+                "when": { "path": "$.status.phase", "op": "eq", "value": "Failed" },
+                "level": "error",
+                "summary": "Failed"
+              },
+              {
+                "when": { "path": "$.status.phase", "op": "eq", "value": "Released" },
+                "level": "warning",
+                "summary": "Released"
+              },
+              {
+                "when": { "path": "$.status.phase", "op": "eq", "value": "Pending" },
+                "level": "progress",
+                "summary": "Pending"
+              },
+              { "when": { "path": "$.status.phase", "op": "in", "value": ["Bound", "Available"] }, "level": "ok" }
+            ],
+            "default": "unknown"
+          },
+          "description": "${$.spec.capacity.storage} · ${$.spec.claimRef.name|default:unclaimed}",
+          "columns": [
+            { "title": "Status", "path": "$.status.phase", "render": "status" },
+            { "title": "Capacity", "path": "$.spec.capacity.storage", "render": "quantity" },
+            { "title": "Access modes", "path": "$.spec.accessModes[*]", "render": "badge" },
+            { "title": "Reclaim policy", "path": "$.spec.persistentVolumeReclaimPolicy" },
+            { "title": "Claim", "path": "$.spec.claimRef.name", "default": "<none>" },
+            { "title": "Claim namespace", "path": "$.spec.claimRef.namespace" },
+            { "title": "StorageClass", "path": "$.spec.storageClassName", "default": "<none>" },
+            { "title": "Driver", "path": "$.spec.csi.driver", "hidden": true },
+            { "title": "Volume handle", "path": "$.spec.csi.volumeHandle", "hidden": true },
+            { "title": "Reason", "path": "$.status.reason", "hidden": true },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "claim",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.claimRef",
+                "group": { "path": "$.apiVersion", "default": "" },
+                "kind": { "path": "$.kind", "default": "PersistentVolumeClaim" },
+                "namespace": "$.namespace"
+              }
+            },
+            {
+              "id": "storageclass",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec",
+                "name": "$.storageClassName",
+                "group": { "default": "storage.k8s.io" },
+                "kind": { "default": "StorageClass" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "storageclasses",
+          "title": "StorageClasses",
+          "icon": "layers",
+          "resources": [{ "group": "storage.k8s.io", "kind": "StorageClass" }],
+          "description": "${$.provisioner}",
+          "columns": [
+            { "title": "Provisioner", "path": "$.provisioner" },
+            { "title": "Reclaim policy", "path": "$.reclaimPolicy", "default": "Delete" },
+            { "title": "Binding mode", "path": "$.volumeBindingMode", "default": "Immediate" },
+            { "title": "Expansion", "path": "$.allowVolumeExpansion", "render": "boolean", "default": "No" },
+            {
+              "title": "Default",
+              "path": "$.metadata.annotations['storageclass.kubernetes.io/is-default-class']",
+              "render": "boolean",
+              "default": "No"
+            },
+            { "title": "Parameters", "path": "$.parameters", "render": "labels", "hidden": true },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "pvs",
+              "title": "PersistentVolumes",
+              "relation": {
+                "type": "reverseFieldRef",
+                "group": "",
+                "kind": "PersistentVolume",
+                "items": "$.spec.storageClassName",
+                "match": { "name": "${name}" }
+              }
+            },
+            {
+              "id": "pvcs",
+              "title": "PersistentVolumeClaims",
+              "relation": {
+                "type": "reverseFieldRef",
+                "group": "",
+                "kind": "PersistentVolumeClaim",
+                "items": "$.spec.storageClassName",
+                "match": { "name": "${name}" },
+                "allNamespaces": true
+              }
+            }
+          ]
+        },
+        {
+          // CSI snapshots (CRD); section automatically hides if unavailable on the cluster.
+          "id": "volumesnapshots",
+          "title": "VolumeSnapshots",
+          "icon": "device-camera",
+          "resources": [{ "group": "snapshot.storage.k8s.io", "kind": "VolumeSnapshot" }],
+          "status": {
+            "rules": [
+              { "when": { "path": "$.status.error", "op": "exists" }, "level": "error", "summary": "Error" },
+              { "when": { "path": "$.status.readyToUse", "op": "eq", "value": true }, "level": "ok" }
+            ],
+            "default": "progress"
+          },
+          "description": "${$.spec.source.persistentVolumeClaimName} · ${$.status.restoreSize}",
+          "columns": [
+            { "title": "Ready", "path": "$.status.readyToUse", "render": "boolean", "default": "No" },
+            { "title": "Source PVC", "path": "$.spec.source.persistentVolumeClaimName" },
+            { "title": "Size", "path": "$.status.restoreSize", "render": "quantity" },
+            { "title": "Class", "path": "$.spec.volumeSnapshotClassName" },
+            { "title": "Content", "path": "$.status.boundVolumeSnapshotContentName", "hidden": true },
+            { "title": "Error", "path": "$.status.error.message", "hidden": true },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "source",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.source",
+                "name": "$.persistentVolumeClaimName",
+                "group": { "default": "" },
+                "kind": { "default": "PersistentVolumeClaim" }
+              }
+            }
+          ]
+        },
+        {
+          // Attach CSI volumes to nodes; a stuck attachment often causes pods to remain in ContainerCreating.
+          "id": "volumeattachments",
+          "title": "VolumeAttachments",
+          "icon": "plug",
+          "resources": [{ "group": "storage.k8s.io", "kind": "VolumeAttachment" }],
+          "status": {
+            "rules": [
+              {
+                "when": { "path": "$.status['attachError','detachError'].message", "op": "exists" },
+                "level": "error",
+                "summary": "Error"
+              },
+              { "when": { "path": "$.status.attached", "op": "eq", "value": true }, "level": "ok" }
+            ],
+            "default": "progress"
+          },
+          "description": "${$.spec.source.persistentVolumeName} → ${$.spec.nodeName}",
+          "columns": [
+            { "title": "PV", "path": "$.spec.source.persistentVolumeName" },
+            { "title": "Node", "path": "$.spec.nodeName" },
+            { "title": "Attacher", "path": "$.spec.attacher" },
+            { "title": "Attached", "path": "$.status.attached", "render": "boolean", "default": "No" },
+            { "title": "Error", "path": "$.status['attachError','detachError'].message", "hidden": true },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "volume",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.source",
+                "name": "$.persistentVolumeName",
+                "group": { "default": "" },
+                "kind": { "default": "PersistentVolume" }
+              }
+            },
+            {
+              "id": "node",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec",
+                "name": "$.nodeName",
+                "group": { "default": "" },
+                "kind": { "default": "Node" }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

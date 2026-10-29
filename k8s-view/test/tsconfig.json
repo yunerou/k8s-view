@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "mocha"],
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "paths": { "vscode": ["./stubs/vscode.ts"] }
+  },
+  "include": ["./unit/**/*.ts", "./unit/**/*.tsx", "./stubs/**/*.ts", "../scripts/**/*.ts", "../*.config.mts"]
+}

@@ -1,0 +1,6 @@
+{
+  // js-debug's Network view enables Node network inspection in the extension host. On Node 24 (VS Code ≥ 1.14x),
+  // reading an `http` response with setEncoding() throws "Missing dataLength in event", breaking the HTTP parser and causing
+  // the extension host to crash (code 6) → the Extension Development Host window closes when F5 is pressed.
+  "debug.javascript.enableNetworkView": false
+}

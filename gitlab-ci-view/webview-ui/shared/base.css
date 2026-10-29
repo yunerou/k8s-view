@@ -1,0 +1,121 @@
+/* Shared by all webviews: use only --vscode-* variables to support all themes (including high contrast). */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+}
+
+:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+.muted {
+  color: var(--vscode-descriptionForeground);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.icon-button[aria-pressed="true"] {
+  background: var(--vscode-inputOption-activeBackground);
+}
+
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+  text-align: left;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.banner {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 8px 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--vscode-textLink-foreground);
+  background: var(--vscode-textBlockQuote-background);
+}
+
+.banner-error {
+  border-left-color: var(--vscode-errorForeground);
+}
+
+.banner-warning {
+  border-left-color: var(--vscode-editorWarning-foreground);
+}
+
+.banner-body {
+  flex: 1;
+}
+
+.level-ok {
+  color: var(--vscode-testing-iconPassed);
+}
+.level-error {
+  color: var(--vscode-testing-iconFailed);
+}
+.level-warning {
+  color: var(--vscode-editorWarning-foreground);
+}
+.level-progress {
+  color: var(--vscode-charts-blue);
+}
+.level-manual {
+  color: var(--vscode-charts-purple);
+}
+.level-neutral {
+  color: var(--vscode-disabledForeground);
+}
+
+.codicon-modifier-spin {
+  animation: codicon-spin 1.5s steps(30) infinite;
+}

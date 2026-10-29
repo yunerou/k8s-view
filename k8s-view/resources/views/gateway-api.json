@@ -1,0 +1,290 @@
+{
+  "$schema": "../../schemas/k8s-view.schema.json",
+  "version": 1,
+  "views": [
+    {
+      "id": "gateway-api",
+      "title": "Gateway API",
+      "icon": "radio-tower",
+      "order": 6,
+      "requires": ["gateway.networking.k8s.io"],
+      "sections": [
+        {
+          "id": "gateways",
+          "title": "Gateways",
+          "icon": "radio-tower",
+          "resources": [{ "group": "gateway.networking.k8s.io", "kind": "Gateway" }],
+          "status": {
+            "rules": [
+              {
+                "when": { "path": "$.status.conditions[?(@.type=='Programmed')].status", "op": "eq", "value": "True" },
+                "level": "ok"
+              },
+              {
+                "when": { "path": "$.status.conditions[?(@.type=='Programmed')].status", "op": "eq", "value": "False" },
+                "level": "error"
+              }
+            ],
+            "default": "progress"
+          },
+          "description": "${$.spec.gatewayClassName} · ${$.status.addresses[*].value}",
+          "columns": [
+            { "title": "Class", "path": "$.spec.gatewayClassName" },
+            { "title": "Addresses", "path": "$.status.addresses[*].value" },
+            { "title": "Listeners", "template": "${$.spec.listeners[*].name}" },
+            { "title": "Hostnames", "path": "$.spec.listeners[*].hostname", "hidden": true },
+            {
+              "title": "Programmed",
+              "path": "$.status.conditions[?(@.type=='Programmed')].status",
+              "render": "status"
+            },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "listeners",
+              "title": "Listeners",
+              "relation": {
+                "type": "field",
+                "items": "$.spec.listeners[*]",
+                "label": "${$.name}",
+                "description": "${$.protocol}:${$.port} ${$.hostname}",
+                "icon": "symbol-event"
+              }
+            },
+            {
+              "id": "httproutes",
+              "relation": {
+                "type": "reverseFieldRef",
+                "group": "gateway.networking.k8s.io",
+                "kind": "HTTPRoute",
+                "items": "$.spec.parentRefs[*]",
+                "match": { "name": "${name}", "namespace": "${namespace}" },
+                "allNamespaces": true
+              }
+            },
+            {
+              "id": "grpcroutes",
+              "relation": {
+                "type": "reverseFieldRef",
+                "group": "gateway.networking.k8s.io",
+                "kind": "GRPCRoute",
+                "items": "$.spec.parentRefs[*]",
+                "match": { "name": "${name}", "namespace": "${namespace}" },
+                "allNamespaces": true
+              }
+            },
+            {
+              "id": "tlsroutes",
+              "relation": {
+                "type": "reverseFieldRef",
+                "group": "gateway.networking.k8s.io",
+                "kind": "TLSRoute",
+                "items": "$.spec.parentRefs[*]",
+                "match": { "name": "${name}", "namespace": "${namespace}" },
+                "allNamespaces": true
+              }
+            },
+            {
+              "id": "tcproutes",
+              "relation": {
+                "type": "reverseFieldRef",
+                "group": "gateway.networking.k8s.io",
+                "kind": "TCPRoute",
+                "items": "$.spec.parentRefs[*]",
+                "match": { "name": "${name}", "namespace": "${namespace}" },
+                "allNamespaces": true
+              }
+            },
+            {
+              "id": "udproutes",
+              "relation": {
+                "type": "reverseFieldRef",
+                "group": "gateway.networking.k8s.io",
+                "kind": "UDPRoute",
+                "items": "$.spec.parentRefs[*]",
+                "match": { "name": "${name}", "namespace": "${namespace}" },
+                "allNamespaces": true
+              }
+            }
+          ]
+        },
+        {
+          "id": "routes",
+          "title": "Routes",
+          "icon": "git-compare",
+          "groupBy": "kind",
+          "resources": [
+            { "group": "gateway.networking.k8s.io", "kind": "HTTPRoute" },
+            { "group": "gateway.networking.k8s.io", "kind": "GRPCRoute" },
+            { "group": "gateway.networking.k8s.io", "kind": "TLSRoute" },
+            { "group": "gateway.networking.k8s.io", "kind": "TCPRoute" },
+            { "group": "gateway.networking.k8s.io", "kind": "UDPRoute" }
+          ],
+          "status": {
+            "rules": [
+              {
+                "when": {
+                  "path": "$.status.parents[*].conditions[?(@.type=='Accepted')].status",
+                  "op": "eq",
+                  "value": "False"
+                },
+                "level": "error"
+              },
+              {
+                "when": {
+                  "path": "$.status.parents[*].conditions[?(@.type=='ResolvedRefs')].status",
+                  "op": "eq",
+                  "value": "False"
+                },
+                "level": "warning",
+                "summary": "Unresolved refs"
+              },
+              {
+                "when": {
+                  "path": "$.status.parents[*].conditions[?(@.type=='Accepted')].status",
+                  "op": "eq",
+                  "value": "True"
+                },
+                "level": "ok"
+              }
+            ],
+            "default": "unknown"
+          },
+          "description": "${$.spec.hostnames[*]}",
+          "columns": [
+            { "title": "Hostnames", "path": "$.spec.hostnames[*]" },
+            { "title": "Parents", "path": "$.spec.parentRefs[*].name" },
+            {
+              "title": "Accepted",
+              "path": "$.status.parents[*].conditions[?(@.type=='Accepted')].status",
+              "render": "status"
+            },
+            {
+              "title": "Resolved refs",
+              "path": "$.status.parents[*].conditions[?(@.type=='ResolvedRefs')].status",
+              "render": "status"
+            },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "backends",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.rules[*].backendRefs[*]",
+                "group": { "path": "$.group", "default": "" },
+                "kind": { "path": "$.kind", "default": "Service" },
+                "namespace": "$.namespace"
+              }
+            }
+          ]
+        },
+        {
+          "id": "policies",
+          "title": "Policies",
+          "icon": "shield",
+          "groupBy": "kind",
+          "resources": [
+            { "group": "gateway.envoyproxy.io", "kind": "BackendTrafficPolicy" },
+            { "group": "gateway.envoyproxy.io", "kind": "ClientTrafficPolicy" },
+            { "group": "gateway.envoyproxy.io", "kind": "SecurityPolicy" },
+            { "group": "gateway.envoyproxy.io", "kind": "EnvoyExtensionPolicy" },
+            { "group": "gateway.envoyproxy.io", "kind": "EnvoyPatchPolicy" },
+            { "group": "gateway.networking.k8s.io", "kind": "BackendTLSPolicy" },
+            { "group": "gateway.networking.k8s.io", "kind": "BackendLBPolicy" }
+          ],
+          "status": {
+            "rules": [
+              {
+                "when": {
+                  "path": "$.status.ancestors[*].conditions[?(@.type=='Accepted')].status",
+                  "op": "eq",
+                  "value": "False"
+                },
+                "level": "error"
+              },
+              {
+                "when": {
+                  "path": "$.status.ancestors[*].conditions[?(@.type=='Accepted')].status",
+                  "op": "eq",
+                  "value": "True"
+                },
+                "level": "ok"
+              }
+            ],
+            "default": "unknown"
+          },
+          "description": "${$.spec.targetRefs[*].kind}${$.spec.targetRef.kind} ${$.spec.targetRefs[*].name}${$.spec.targetRef.name}",
+          "columns": [
+            { "title": "Target kind", "template": "${$.spec.targetRefs[*].kind}${$.spec.targetRef.kind}" },
+            { "title": "Targets", "template": "${$.spec.targetRefs[*].name}${$.spec.targetRef.name}" },
+            {
+              "title": "Accepted",
+              "path": "$.status.ancestors[*].conditions[?(@.type=='Accepted')].status",
+              "render": "status"
+            },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "targets",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.targetRefs[*]",
+                "group": { "path": "$.group", "default": "" },
+                "kind": { "path": "$.kind", "default": "Gateway" }
+              }
+            },
+            {
+              "id": "target",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.targetRef",
+                "group": { "path": "$.group", "default": "" },
+                "kind": { "path": "$.kind", "default": "Gateway" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "gatewayclasses",
+          "title": "GatewayClasses",
+          "icon": "symbol-interface",
+          "resources": [{ "group": "gateway.networking.k8s.io", "kind": "GatewayClass" }],
+          "status": {
+            "rules": [
+              {
+                "when": { "path": "$.status.conditions[?(@.type=='Accepted')].status", "op": "eq", "value": "True" },
+                "level": "ok"
+              },
+              {
+                "when": { "path": "$.status.conditions[?(@.type=='Accepted')].status", "op": "eq", "value": "False" },
+                "level": "error"
+              }
+            ],
+            "default": "unknown"
+          },
+          "description": "${$.spec.controllerName}",
+          "columns": [
+            { "title": "Controller", "path": "$.spec.controllerName" },
+            { "title": "Accepted", "path": "$.status.conditions[?(@.type=='Accepted')].status", "render": "status" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ]
+        },
+        {
+          "id": "referencegrants",
+          "title": "ReferenceGrants",
+          "icon": "references",
+          "resources": [{ "group": "gateway.networking.k8s.io", "kind": "ReferenceGrant" }],
+          "description": "${$.spec.from[*].namespace} → ${$.spec.to[*].kind}",
+          "columns": [
+            { "title": "From", "template": "${$.spec.from[*].kind} in ${$.spec.from[*].namespace}" },
+            { "title": "To", "path": "$.spec.to[*].kind" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ]
+        }
+      ]
+    }
+  ]
+}

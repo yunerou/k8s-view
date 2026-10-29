@@ -1,0 +1,11 @@
+**
+!dist/extension.js
+!dist/webview/**
+!resources/**
+!schemas/**
+!l10n/**
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE
+resources/icons/k8s-view-marketplace.svg

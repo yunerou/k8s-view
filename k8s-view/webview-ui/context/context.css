@@ -1,0 +1,208 @@
+body {
+  background: var(--vscode-sideBar-background, transparent);
+  color: var(--vscode-sideBar-foreground, var(--vscode-foreground));
+}
+
+.context-app {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 16px 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+/* Cluster and Namespace share a row; wrap when the sidebar is too narrow. */
+.picker-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.picker-row > .field {
+  flex: 1 1 130px;
+  min-width: 0;
+}
+
+/* Cluster names are often long: the cluster picker uses the full row and wraps names instead of truncating them. */
+.picker-row > .cluster-field {
+  flex-basis: 100%;
+}
+
+.cluster-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--vscode-dropdown-border, var(--vscode-widget-border, transparent));
+  border-radius: 2px;
+  background: var(--vscode-dropdown-background);
+  color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cluster-button:hover {
+  background: var(--vscode-list-hoverBackground, var(--vscode-dropdown-background));
+}
+
+.cluster-button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.cluster-button-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cluster-name {
+  overflow-wrap: anywhere;
+}
+
+.cluster-detail {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.field vscode-single-select,
+.field-row vscode-textfield {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.protected-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--vscode-errorForeground);
+  font-weight: normal;
+  text-transform: none;
+}
+
+.hint {
+  display: flex;
+  gap: 4px;
+  margin: 2px 0 4px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.status-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.status-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 22px;
+}
+
+.status-line.error {
+  color: var(--vscode-errorForeground);
+}
+
+.status-message {
+  overflow-wrap: anywhere;
+}
+
+.status-line vscode-button,
+.status-line .status-action {
+  margin-left: auto;
+}
+
+.refresh-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  margin: 2px 0 6px;
+}
+
+/* Radio-style buttons (Pause | Live | 3s | 5s | 10s): one row, without clipped popups. */
+.segmented {
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--vscode-button-border, var(--vscode-widget-border, transparent));
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* Real radios (keyboard, screen readers), visually hidden; labels act as buttons. */
+.segment input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segment {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding: 1px 7px;
+  border: 0;
+  border-left: 1px solid var(--vscode-sideBar-background, transparent);
+  background: var(--vscode-button-secondaryBackground);
+  color: var(--vscode-button-secondaryForeground);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.segment:first-child {
+  border-left: 0;
+}
+
+.segment:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.segment.checked {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+.segment:has(input:focus-visible) {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}

@@ -1,0 +1,122 @@
+{
+  "$schema": "../../schemas/k8s-view.schema.json",
+  "version": 1,
+  "views": [
+    {
+      "id": "cert-manager",
+      "title": "cert-manager",
+      "icon": "workspace-trusted",
+      "order": 11,
+      "requires": ["cert-manager.io"],
+      "sections": [
+        {
+          "id": "certificates",
+          "title": "Certificates",
+          "icon": "verified",
+          "resources": [{ "group": "cert-manager.io", "kind": "Certificate" }],
+          "status": { "preset": "readyCondition" },
+          "description": "${$.spec.dnsNames[0]}",
+          "columns": [
+            { "title": "Ready", "path": "$.status.conditions[?(@.type=='Ready')].status", "render": "status" },
+            { "title": "Secret", "path": "$.spec.secretName" },
+            { "title": "Issuer", "template": "${$.spec.issuerRef.kind|default:Issuer}/${$.spec.issuerRef.name}" },
+            { "title": "DNS names", "path": "$.spec.dnsNames[*]" },
+            { "title": "Not after", "path": "$.status.notAfter" },
+            { "title": "Renewal", "path": "$.status.renewalTime" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "requests",
+              "relation": { "type": "ownerRef", "group": "cert-manager.io", "kind": "CertificateRequest" },
+              "status": { "preset": "readyCondition" },
+              "children": [
+                {
+                  "id": "orders",
+                  "relation": { "type": "ownerRef", "group": "acme.cert-manager.io", "kind": "Order" },
+                  "status": {
+                    "rules": [
+                      { "when": { "path": "$.status.state", "op": "eq", "value": "valid" }, "level": "ok" },
+                      {
+                        "when": { "path": "$.status.state", "op": "in", "value": ["invalid", "errored", "expired"] },
+                        "level": "error"
+                      }
+                    ],
+                    "default": "progress"
+                  },
+                  "description": "${$.status.state}",
+                  "children": [
+                    {
+                      "id": "challenges",
+                      "relation": { "type": "ownerRef", "group": "acme.cert-manager.io", "kind": "Challenge" },
+                      "status": {
+                        "rules": [
+                          { "when": { "path": "$.status.state", "op": "eq", "value": "valid" }, "level": "ok" },
+                          {
+                            "when": {
+                              "path": "$.status.state",
+                              "op": "in",
+                              "value": ["invalid", "errored", "expired"]
+                            },
+                            "level": "error"
+                          }
+                        ],
+                        "default": "progress"
+                      },
+                      "description": "${$.spec.type} ${$.status.state}"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "issuers",
+          "title": "Issuers",
+          "icon": "organization",
+          "groupBy": "kind",
+          "status": { "preset": "readyCondition" },
+          "resources": [
+            { "group": "cert-manager.io", "kind": "Issuer" },
+            { "group": "cert-manager.io", "kind": "ClusterIssuer" }
+          ],
+          "columns": [
+            { "title": "Ready", "path": "$.status.conditions[?(@.type=='Ready')].status", "render": "status" },
+            { "title": "Type", "template": "${$.spec.acme.server}${$.spec.ca.secretName}${$.spec.vault.server}" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ]
+        }
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "id": "certmanager.renew",
+      "title": "cert-manager: Renew",
+      "group": "cert-manager",
+      "icon": "refresh",
+      "refreshAfter": true,
+      "multi": "sequential",
+      "match": [{ "group": "cert-manager.io", "kind": "Certificate" }],
+      "run": {
+        "type": "process",
+        "command": "cmctl",
+        "args": ["renew", "${name}", "-n", "${namespace}", "--context", "${context}"]
+      }
+    },
+    {
+      "id": "certmanager.status",
+      "title": "cert-manager: Status",
+      "group": "cert-manager",
+      "icon": "info",
+      "match": [{ "group": "cert-manager.io", "kind": "Certificate" }],
+      "run": {
+        "type": "terminal",
+        "name": "cmctl status ${name}",
+        "command": "cmctl",
+        "args": ["status", "certificate", "${name}", "-n", "${namespace}", "--context", "${context}"]
+      }
+    }
+  ]
+}

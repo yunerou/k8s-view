@@ -1,0 +1,145 @@
+{
+  "$schema": "../../schemas/k8s-view.schema.json",
+  "version": 1,
+  "views": [
+    {
+      "id": "node",
+      "title": "Node",
+      "icon": "server-environment",
+      "order": 8,
+      "sections": [
+        {
+          "id": "nodes",
+          "title": "Nodes",
+          "icon": "server-environment",
+          "resources": [{ "kind": "Node" }],
+          "status": {
+            "rules": [
+              {
+                "when": { "path": "$.status.conditions[?(@.type=='Ready')].status", "op": "neq", "value": "True" },
+                "level": "error",
+                "summary": "NotReady"
+              },
+              {
+                "when": { "path": "$.spec.unschedulable", "op": "eq", "value": true },
+                "level": "warning",
+                "summary": "SchedulingDisabled"
+              },
+              {
+                "when": {
+                  "path": "$.status.conditions[?(@.type=='MemoryPressure' || @.type=='DiskPressure' || @.type=='PIDPressure')].status",
+                  "op": "eq",
+                  "value": "True"
+                },
+                "level": "warning",
+                "summary": "Pressure"
+              }
+            ],
+            "default": "ok"
+          },
+          "description": "${$.status.nodeInfo.kubeletVersion} · ${$.metadata.labels['node.kubernetes.io/instance-type']}",
+          "columns": [
+            { "title": "Ready", "path": "$.status.conditions[?(@.type=='Ready')].status", "render": "status" },
+            { "title": "Cordoned", "path": "$.spec.unschedulable", "render": "boolean", "default": "No" },
+            { "title": "Version", "path": "$.status.nodeInfo.kubeletVersion" },
+            { "title": "Internal IP", "path": "$.status.addresses[?(@.type=='InternalIP')].address" },
+            { "title": "Instance type", "path": "$.metadata.labels['node.kubernetes.io/instance-type']" },
+            { "title": "Zone", "path": "$.metadata.labels['topology.kubernetes.io/zone']", "hidden": true },
+            {
+              "id": "cpu-used",
+              "title": "CPU Used",
+              "path": "$.resourceMetrics.cpu.used",
+              "render": "cpu",
+              "default": "-"
+            },
+            {
+              "id": "cpu-percent",
+              "title": "CPU Used/Req %",
+              "path": "$.resourceMetrics.cpu.percent",
+              "render": "percentage",
+              "default": "-"
+            },
+            {
+              "id": "cpu-request",
+              "title": "CPU Request",
+              "path": "$.resourceMetrics.cpu.request",
+              "render": "cpu",
+              "default": "-"
+            },
+            {
+              "id": "cpu-limit",
+              "title": "CPU Limit",
+              "path": "$.resourceMetrics.cpu.limit",
+              "render": "cpu",
+              "default": "-"
+            },
+            {
+              "id": "memory-used",
+              "title": "Mem Used",
+              "path": "$.resourceMetrics.memory.used",
+              "render": "memory",
+              "default": "-"
+            },
+            {
+              "id": "memory-percent",
+              "title": "Mem Used/Req %",
+              "path": "$.resourceMetrics.memory.percent",
+              "render": "percentage",
+              "default": "-"
+            },
+            {
+              "id": "memory-request",
+              "title": "Mem Request",
+              "path": "$.resourceMetrics.memory.request",
+              "render": "memory",
+              "default": "-"
+            },
+            {
+              "id": "memory-limit",
+              "title": "Mem Limit",
+              "path": "$.resourceMetrics.memory.limit",
+              "render": "memory",
+              "default": "-"
+            },
+            { "id": "cpu", "title": "CPU allocatable", "path": "$.status.allocatable.cpu", "render": "quantity" },
+            {
+              "id": "memory",
+              "title": "Memory allocatable",
+              "path": "$.status.allocatable.memory",
+              "render": "quantity"
+            },
+            { "title": "Taints", "path": "$.spec.taints[*].key", "render": "badge", "hidden": true },
+            { "title": "OS image", "path": "$.status.nodeInfo.osImage", "hidden": true },
+            { "title": "Runtime", "path": "$.status.nodeInfo.containerRuntimeVersion", "hidden": true },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "taints",
+              "title": "Taints",
+              "relation": {
+                "type": "field",
+                "items": "$.spec.taints[*]",
+                "label": "${$.key}",
+                "description": "${$.value} ${$.effect}",
+                "icon": "warning"
+              }
+            },
+            {
+              // Pods running on the node (all namespaces)
+              "id": "pods",
+              "relation": {
+                "type": "reverseFieldRef",
+                "group": "",
+                "kind": "Pod",
+                "items": "$.spec.nodeName",
+                "match": { "name": "${name}" },
+                "allNamespaces": true
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,210 @@
+{
+  "$schema": "../../schemas/k8s-view.schema.json",
+  "version": 1,
+  "views": [
+    {
+      "id": "scaling",
+      "title": "Scaling",
+      "icon": "arrow-both",
+      "order": 7,
+      "sections": [
+        {
+          "id": "hpas",
+          "title": "HorizontalPodAutoscalers",
+          "icon": "arrow-both",
+          "resources": [{ "group": "autoscaling", "kind": "HorizontalPodAutoscaler" }],
+          "status": {
+            "rules": [
+              {
+                "when": {
+                  "path": "$.status.conditions[?(@.type=='AbleToScale')].status",
+                  "op": "eq",
+                  "value": "False"
+                },
+                "level": "error",
+                "summary": "Unable to scale"
+              },
+              {
+                "when": {
+                  "path": "$.status.conditions[?(@.type=='ScalingActive')].status",
+                  "op": "eq",
+                  "value": "False"
+                },
+                "level": "warning",
+                "summary": "Scaling inactive"
+              }
+            ],
+            "default": "ok"
+          },
+          "description": "${$.status.currentReplicas|default:0} replicas (${$.spec.minReplicas|default:1}–${$.spec.maxReplicas}) → ${$.spec.scaleTargetRef.kind}/${$.spec.scaleTargetRef.name}",
+          "columns": [
+            { "title": "Target", "template": "${$.spec.scaleTargetRef.kind}/${$.spec.scaleTargetRef.name}" },
+            { "title": "Min", "path": "$.spec.minReplicas", "default": "1" },
+            { "title": "Max", "path": "$.spec.maxReplicas" },
+            { "title": "Current", "path": "$.status.currentReplicas", "default": "0" },
+            { "title": "Desired", "path": "$.status.desiredReplicas", "default": "0" },
+            {
+              "title": "Metrics",
+              "path": "$.spec.metrics[*]['resource','pods','external','object'].metric.name",
+              "hidden": true
+            },
+            { "title": "Resource", "path": "$.spec.metrics[*].resource.name" },
+            { "title": "Target %", "path": "$.spec.metrics[*].resource.target.averageUtilization" },
+            { "title": "Current %", "path": "$.status.currentMetrics[*].resource.current.averageUtilization" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "target",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.scaleTargetRef",
+                "group": { "path": "$.apiVersion", "default": "apps" },
+                "kind": { "path": "$.kind", "default": "Deployment" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "vpas",
+          "title": "VerticalPodAutoscalers",
+          "icon": "arrow-swap",
+          "resources": [{ "group": "autoscaling.k8s.io", "kind": "VerticalPodAutoscaler" }],
+          "status": {
+            "rules": [
+              {
+                "when": {
+                  "path": "$.status.conditions[?(@.type=='RecommendationProvided')].status",
+                  "op": "eq",
+                  "value": "True"
+                },
+                "level": "ok"
+              },
+              {
+                "when": {
+                  "path": "$.status.conditions[?(@.type=='ConfigUnsupported')].status",
+                  "op": "eq",
+                  "value": "True"
+                },
+                "level": "error",
+                "summary": "Config unsupported"
+              }
+            ],
+            "default": "progress"
+          },
+          "description": "${$.spec.updatePolicy.updateMode|default:Auto} → ${$.spec.targetRef.kind}/${$.spec.targetRef.name}",
+          "columns": [
+            { "title": "Target", "template": "${$.spec.targetRef.kind}/${$.spec.targetRef.name}" },
+            { "title": "Mode", "path": "$.spec.updatePolicy.updateMode", "default": "Auto" },
+            {
+              "title": "CPU",
+              "path": "$.status.recommendation.containerRecommendations[*].target.cpu",
+              "render": "quantity"
+            },
+            {
+              "title": "Memory",
+              "path": "$.status.recommendation.containerRecommendations[*].target.memory",
+              "render": "quantity"
+            },
+            {
+              "title": "Provided",
+              "path": "$.status.conditions[?(@.type=='RecommendationProvided')].status",
+              "render": "status"
+            },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "recommendations",
+              "title": "Recommendations",
+              "relation": {
+                "type": "field",
+                "items": "$.status.recommendation.containerRecommendations[*]",
+                "label": "${$.containerName}",
+                "description": "cpu ${$.target.cpu} · memory ${$.target.memory}",
+                "icon": "lightbulb"
+              }
+            },
+            {
+              "id": "target",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.targetRef",
+                "group": { "path": "$.apiVersion", "default": "apps" },
+                "kind": { "path": "$.kind", "default": "Deployment" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "scaledobjects",
+          "title": "KEDA ScaledObjects",
+          "icon": "pulse",
+          "groupBy": "kind",
+          "resources": [{ "group": "keda.sh", "kind": "ScaledObject" }, { "group": "keda.sh", "kind": "ScaledJob" }],
+          "status": { "preset": "readyCondition" },
+          "columns": [
+            {
+              "title": "Target",
+              "template": "${$.spec.scaleTargetRef.kind|default:Deployment}/${$.spec.scaleTargetRef.name}"
+            },
+            { "title": "Min", "path": "$.spec.minReplicaCount", "default": "0" },
+            { "title": "Max", "path": "$.spec.maxReplicaCount", "default": "100" },
+            { "title": "Triggers", "path": "$.spec.triggers[*].type", "render": "badge" },
+            { "title": "Active", "path": "$.status.conditions[?(@.type=='Active')].status", "render": "status" },
+            { "title": "Ready", "path": "$.status.conditions[?(@.type=='Ready')].status", "render": "status" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "target",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.scaleTargetRef",
+                "group": { "path": "$.apiVersion", "default": "apps" },
+                "kind": { "path": "$.kind", "default": "Deployment" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "pdbs",
+          "title": "PodDisruptionBudgets",
+          "icon": "shield",
+          "resources": [{ "group": "policy", "kind": "PodDisruptionBudget" }],
+          "status": {
+            "rules": [
+              {
+                "when": {
+                  "path": "$.status.conditions[?(@.type=='DisruptionAllowed')].status",
+                  "op": "eq",
+                  "value": "False"
+                },
+                "level": "warning",
+                "summary": "No disruption allowed"
+              }
+            ],
+            "default": "ok"
+          },
+          "description": "${$.status.currentHealthy|default:0}/${$.status.expectedPods|default:0} healthy · ${$.status.disruptionsAllowed|default:0} allowed",
+          "columns": [
+            { "title": "Min available", "path": "$.spec.minAvailable" },
+            { "title": "Max unavailable", "path": "$.spec.maxUnavailable" },
+            { "title": "Allowed disruptions", "path": "$.status.disruptionsAllowed", "default": "0" },
+            {
+              "title": "Healthy",
+              "template": "${$.status.currentHealthy|default:0}/${$.status.expectedPods|default:0}"
+            },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "pods",
+              "relation": { "type": "labelSelector", "kind": "Pod", "selector": "$.spec.selector" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "vscode-extension",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.18.0",
+    "pnpm": ">=12.6.0"
+  },
+  "scripts": {
+    "lint": "biome check .",
+    "lint:ci": "biome ci .",
+    "format": "biome format --write .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "build": "pnpm -r build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "typescript": "catalog:"
+  }
+}

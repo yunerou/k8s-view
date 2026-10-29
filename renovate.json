@@ -1,0 +1,9 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "rangeStrategy": "pin",
+  "packageRules": [
+    { "matchPackageNames": ["@types/node"], "allowedVersions": "<25" },
+    { "matchPackageNames": ["@types/vscode"], "enabled": false }
+  ]
+}

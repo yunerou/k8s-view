@@ -1,0 +1,85 @@
+# Integration test fixture: apply to a kind cluster before running `pnpm test:integration`.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: k8s-view-test
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: k8s-view-test
+  labels: { app: web, team: payments }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: web } }
+  template:
+    metadata: { labels: { app: web } }
+    spec:
+      containers:
+        - name: web
+          image: registry.k8s.io/pause:3.10
+          ports: [{ containerPort: 80 }]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: k8s-view-test
+spec:
+  selector: { app: web }
+  ports: [{ port: 80, targetPort: 80 }]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: settings
+  namespace: k8s-view-test
+data:
+  app.conf: "mode=test"
+  level: "debug"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: credentials
+  namespace: k8s-view-test
+stringData:
+  password: hunter2
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nightly
+  namespace: k8s-view-test
+spec:
+  schedule: "0 3 * * *"
+  suspend: true
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: job
+              image: registry.k8s.io/pause:3.10
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: builder
+  namespace: k8s-view-test
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: builder-view
+  namespace: k8s-view-test
+subjects:
+  - kind: ServiceAccount
+    name: builder
+    namespace: k8s-view-test
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view

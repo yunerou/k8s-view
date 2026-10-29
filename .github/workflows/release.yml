@@ -1,0 +1,50 @@
+name: Release
+
+on:
+  push:
+    tags: ["k8s-view-v*"]
+
+permissions:
+  contents: write
+  id-token: write # Sign in to Entra ID via GitHub OIDC for `vsce publish --azure-credential`.
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: marketplace
+    defaults:
+      run:
+        working-directory: k8s-view
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+      - run: pnpm typecheck && pnpm test && pnpm build
+      - name: Pre-release when the minor version is odd
+        id: channel
+        run: |
+          minor=$(node -p "require('./package.json').version.split('.')[1]")
+          if [ $((minor % 2)) -eq 1 ]; then echo "flag=--pre-release" >> "$GITHUB_OUTPUT"; else echo "flag=" >> "$GITHUB_OUTPUT"; fi
+      - run: pnpm exec vsce package --no-dependencies ${{ steps.channel.outputs.flag }} -o k8s-view.vsix
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Publish to VS Marketplace
+        run: pnpm exec vsce publish --azure-credential --packagePath k8s-view.vsix ${{ steps.channel.outputs.flag }}
+      - name: Publish to Open VSX
+        run: pnpm exec ovsx publish k8s-view.vsix ${{ steps.channel.outputs.flag }} -p "$OVSX_TOKEN"
+        env:
+          OVSX_TOKEN: ${{ secrets.OVSX_TOKEN }}
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: k8s-view/k8s-view.vsix
+          generate_release_notes: true

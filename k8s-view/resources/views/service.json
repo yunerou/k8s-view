@@ -1,0 +1,121 @@
+{
+  "$schema": "../../schemas/k8s-view.schema.json",
+  "version": 1,
+  "views": [
+    {
+      "id": "service",
+      "title": "Service",
+      "icon": "plug",
+      "order": 4,
+      // Active port forwards appear as resources at the top of the view (stop with ■).
+      "portForwards": true,
+      "sections": [
+        {
+          "id": "services",
+          "title": "Services",
+          "icon": "plug",
+          "resources": [{ "kind": "Service" }],
+          "description": "${$.spec.type} · ${$.spec.ports[*].port}",
+          "columns": [
+            { "title": "Type", "path": "$.spec.type" },
+            { "title": "ClusterIP", "path": "$.spec.clusterIP" },
+            {
+              "title": "External IP",
+              "path": "$.status.loadBalancer.ingress[*]['ip','hostname']",
+              "default": "<none>"
+            },
+            { "title": "Ports", "template": "${$.spec.ports[*].port}" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            { "id": "pods", "relation": { "type": "labelSelector", "kind": "Pod", "selector": "$.spec.selector" } }
+          ]
+        },
+        {
+          "id": "ingresses",
+          "title": "Ingresses",
+          "icon": "globe",
+          "resources": [{ "group": "networking.k8s.io", "kind": "Ingress" }],
+          "description": "${$.spec.rules[*].host}",
+          "columns": [
+            { "title": "Class", "path": "$.spec.ingressClassName" },
+            { "title": "Hosts", "path": "$.spec.rules[*].host", "default": "*" },
+            { "title": "Address", "path": "$.status.loadBalancer.ingress[*]['ip','hostname']" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "services",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.rules[*].http.paths[*].backend.service",
+                "group": { "default": "" },
+                "kind": { "default": "Service" }
+              }
+            },
+            {
+              "id": "default-backend",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.defaultBackend.service",
+                "group": { "default": "" },
+                "kind": { "default": "Service" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "httproutes",
+          "title": "HTTPRoutes",
+          "icon": "globe",
+          "resources": [{ "group": "gateway.networking.k8s.io", "kind": "HTTPRoute" }],
+          "status": {
+            "rules": [
+              {
+                "when": {
+                  "path": "$.status.parents[*].conditions[?(@.type=='Accepted')].status",
+                  "op": "eq",
+                  "value": "False"
+                },
+                "level": "error"
+              },
+              {
+                "when": {
+                  "path": "$.status.parents[*].conditions[?(@.type=='Accepted')].status",
+                  "op": "eq",
+                  "value": "True"
+                },
+                "level": "ok"
+              }
+            ],
+            "default": "unknown"
+          },
+          "description": "${$.spec.hostnames[*]}",
+          "columns": [
+            { "title": "Hostnames", "path": "$.spec.hostnames[*]" },
+            { "title": "Paths", "path": "$.spec.rules[*].matches[*].path.value" },
+            { "title": "Parents", "path": "$.spec.parentRefs[*].name" },
+            {
+              "title": "Accepted",
+              "path": "$.status.parents[*].conditions[?(@.type=='Accepted')].status",
+              "render": "status"
+            },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "backends",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.rules[*].backendRefs[*]",
+                "group": { "path": "$.group", "default": "" },
+                "kind": { "path": "$.kind", "default": "Service" },
+                "namespace": "$.namespace"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

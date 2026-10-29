@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      k8s-view: ${{ steps.filter.outputs.k8s-view }}
+      gitlab-ci-view: ${{ steps.filter.outputs.gitlab-ci-view }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            gitlab-ci-view:
+              - 'gitlab-ci-view/**'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - 'tsconfig.base.json'
+              - 'biome.json'
+              - '.github/workflows/ci.yml'
+            k8s-view:
+              - 'k8s-view/**'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - 'tsconfig.base.json'
+              - 'biome.json'
+              - '.github/workflows/ci.yml'
+
+  k8s-view:
+    needs: changes
+    if: needs.changes.outputs.k8s-view == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: k8s-view
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+      - name: Lint
+        run: pnpm exec biome ci .
+        working-directory: .
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test:coverage
+      - name: Build
+        run: pnpm build
+      - name: Generated schema is committed
+        run: git diff --exit-code -- schemas/k8s-view.schema.json
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+      - name: Apply fixtures (workloads, Gateway API, Flux and cert-manager CRDs)
+        run: |
+          kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.0/standard-install.yaml
+          kubectl apply -f https://github.com/fluxcd/flux2/releases/latest/download/install.yaml --server-side
+          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.crds.yaml
+          kubectl apply -f test/fixtures/workload.yaml
+          kubectl -n k8s-view-test rollout status deployment/web --timeout=120s
+      - name: Integration tests
+        run: xvfb-run -a pnpm test:integration
+      - name: Package
+        run: pnpm package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: k8s-view-vsix
+          path: k8s-view/*.vsix
+
+  smoke:
+    needs: changes
+    if: github.ref == 'refs/heads/main' && needs.changes.outputs.k8s-view == 'true'
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: k8s-view
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+      - run: pnpm build
+      - run: pnpm test
+
+  gitlab-ci-view:
+    needs: changes
+    if: needs.changes.outputs.gitlab-ci-view == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gitlab-ci-view
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+      - name: Lint
+        run: pnpm exec biome ci gitlab-ci-view
+        working-directory: .
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test:coverage
+      - name: Build
+        run: pnpm build
+      - name: Integration tests
+        run: xvfb-run -a pnpm test:integration
+      - name: Package
+        run: pnpm package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gitlab-ci-view-vsix
+          path: gitlab-ci-view/*.vsix

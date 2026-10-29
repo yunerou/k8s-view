@@ -1,0 +1,597 @@
+{
+  "$schema": "../../schemas/k8s-view.schema.json",
+  "version": 1,
+  "commands": [
+    {
+      "id": "k8s.describe",
+      "title": "Describe",
+      "group": "General",
+      "icon": "info",
+      "order": 1,
+      "match": [{ "group": "*", "kind": "*" }],
+      "run": {
+        "type": "vscode",
+        "command": "k8sView.describe",
+        "args": [
+          {
+            "context": "${context}",
+            "group": "${group}",
+            "kind": "${kind}",
+            "namespace": "${namespace}",
+            "name": "${name}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k8s.manifest",
+      "title": "Manifest",
+      "group": "General",
+      "icon": "file-code",
+      "order": 2,
+      "match": [{ "group": "*", "kind": "*" }],
+      "run": {
+        "type": "vscode",
+        "command": "k8sView.openManifest",
+        "args": [
+          {
+            "context": "${context}",
+            "group": "${group}",
+            "kind": "${kind}",
+            "namespace": "${namespace}",
+            "name": "${name}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k8s.copyName",
+      "title": "Copy name",
+      "group": "General",
+      "icon": "copy",
+      "order": 3,
+      "match": [{ "group": "*", "kind": "*" }],
+      "run": { "type": "vscode", "command": "k8sView.copyToClipboard", "args": ["${name}"] }
+    },
+    {
+      "id": "pod.logs",
+      "title": "Logs",
+      "group": "Logs",
+      "icon": "output",
+      "order": 1,
+      // All pod containers in one terminal, one color per container; track restarts.
+      "match": [{ "group": "", "kind": "Pod" }],
+      "run": {
+        "type": "vscode",
+        "command": "k8sView.logs",
+        "args": [
+          {
+            "context": "${context}",
+            "group": "${group}",
+            "kind": "${kind}",
+            "namespace": "${namespace}",
+            "name": "${name}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pod.containerLogs",
+      "title": "Logs of container…",
+      "group": "Logs",
+      "icon": "output",
+      "order": 2,
+      "match": [{ "group": "", "kind": "Pod" }],
+      "inputs": [
+        {
+          "id": "container",
+          "type": "pick",
+          "title": "Container",
+          "from": "$.spec['initContainers','containers'][*].name"
+        }
+      ],
+      "run": {
+        "type": "vscode",
+        "command": "k8sView.logs",
+        "args": [
+          {
+            "context": "${context}",
+            "group": "${group}",
+            "kind": "${kind}",
+            "namespace": "${namespace}",
+            "name": "${name}",
+            "container": "${input:container}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "workload.logs",
+      "title": "Logs (all pods)",
+      "group": "Logs",
+      "icon": "output",
+      "order": 1,
+      // All pods matching spec.selector (and all containers); automatically add new pods during rollout/scaling.
+      "match": [
+        { "group": "apps", "kind": "Deployment" },
+        { "group": "apps", "kind": "StatefulSet" },
+        { "group": "apps", "kind": "DaemonSet" },
+        { "group": "apps", "kind": "ReplicaSet" },
+        { "group": "batch", "kind": "Job" }
+      ],
+      "run": {
+        "type": "vscode",
+        "command": "k8sView.logs",
+        "args": [
+          {
+            "context": "${context}",
+            "group": "${group}",
+            "kind": "${kind}",
+            "namespace": "${namespace}",
+            "name": "${name}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "pod.exec",
+      "title": "Exec shell",
+      "group": "Pod",
+      "icon": "terminal",
+      "match": [{ "group": "", "kind": "Pod", "when": { "path": "$.status.phase", "op": "eq", "value": "Running" } }],
+      "inputs": [{ "id": "container", "type": "pick", "title": "Container", "from": "$.spec.containers[*].name" }],
+      "run": {
+        "type": "terminal",
+        "name": "exec ${name}",
+        "command": "kubectl",
+        "args": [
+          "exec",
+          "-it",
+          "${name}",
+          "-c",
+          "${input:container}",
+          "-n",
+          "${namespace}",
+          "--context",
+          "${context}",
+          "--",
+          "sh",
+          "-c",
+          "command -v bash >/dev/null 2>&1 && exec bash || exec sh"
+        ]
+      }
+    },
+    {
+      "id": "pod.portForward",
+      "title": "Port-forward…",
+      "group": "Network",
+      "icon": "plug",
+      "match": [{ "group": "", "kind": "Pod" }, { "group": "", "kind": "Service" }],
+      "inputs": [
+        {
+          "id": "ports",
+          "type": "prompt",
+          "title": "Ports (local:remote, several separated by space)",
+          "default": "${$.spec.containers[0].ports[0].containerPort}${$.spec.ports[0].port}",
+          "pattern": "^\\d+(:\\d+)?( \\d+(:\\d+)?)*$"
+        }
+      ],
+      "run": {
+        "type": "vscode",
+        "command": "k8sView.portForward",
+        "args": [
+          {
+            "context": "${context}",
+            "kind": "${kindLower}",
+            "namespace": "${namespace}",
+            "name": "${name}",
+            "ports": "${input:ports}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "workload.restart",
+      "title": "Rollout restart",
+      "group": "Workload",
+      "icon": "debug-restart",
+      "order": 1,
+      "dangerous": true,
+      "multi": "sequential",
+      "refreshAfter": true,
+      "confirm": "Rollout restart ${kind} ${namespace}/${name} on ${context}? Pods are replaced one by one.",
+      "match": [
+        { "group": "apps", "kind": "Deployment" },
+        { "group": "apps", "kind": "StatefulSet" },
+        { "group": "apps", "kind": "DaemonSet" }
+      ],
+      "run": {
+        "type": "process",
+        "command": "kubectl",
+        "args": ["rollout", "restart", "${kindLower}/${name}", "-n", "${namespace}", "--context", "${context}"]
+      }
+    },
+    {
+      "id": "workload.rolloutStatus",
+      "title": "Rollout status",
+      "group": "Workload",
+      "icon": "pulse",
+      "order": 2,
+      "match": [
+        { "group": "apps", "kind": "Deployment" },
+        { "group": "apps", "kind": "StatefulSet" },
+        { "group": "apps", "kind": "DaemonSet" }
+      ],
+      "run": {
+        "type": "terminal",
+        "name": "rollout ${kindLower}/${name}",
+        "command": "kubectl",
+        "args": [
+          "rollout",
+          "status",
+          "${kindLower}/${name}",
+          "--watch",
+          "-n",
+          "${namespace}",
+          "--context",
+          "${context}"
+        ]
+      }
+    },
+    {
+      "id": "workload.scale",
+      "title": "Scale…",
+      "group": "Workload",
+      "icon": "arrow-both",
+      "dangerous": true,
+      "refreshAfter": true,
+      "match": [
+        { "group": "apps", "kind": "Deployment" },
+        { "group": "apps", "kind": "StatefulSet" },
+        { "group": "apps", "kind": "ReplicaSet" }
+      ],
+      "inputs": [
+        {
+          "id": "replicas",
+          "type": "prompt",
+          "title": "Replicas",
+          "default": "${$.spec.replicas}",
+          "pattern": "^\\d+$"
+        }
+      ],
+      "run": {
+        "type": "process",
+        "command": "kubectl",
+        "args": [
+          "scale",
+          "${kindLower}/${name}",
+          "--replicas=${input:replicas}",
+          "-n",
+          "${namespace}",
+          "--context",
+          "${context}"
+        ]
+      }
+    },
+    {
+      "id": "k8s.delete",
+      "title": "Delete",
+      "group": "Danger",
+      "icon": "trash",
+      "dangerous": true,
+      "multi": "sequential",
+      "refreshAfter": true,
+      "confirm": "Delete ${kind} ${namespace}/${name} on ${context}?",
+      "match": [{ "group": "", "kind": "Pod" }, { "group": "batch", "kind": "Job" }],
+      "run": {
+        "type": "process",
+        "command": "kubectl",
+        "args": ["delete", "${kindLower}", "${name}", "-n", "${namespace}", "--context", "${context}", "--wait=false"]
+      }
+    },
+    {
+      "id": "secret.decrypt",
+      "title": "Decrypt secret",
+      "group": "Secret",
+      "icon": "unlock",
+      // Base64-decode all keys and open a read-only document (never saved to disk).
+      "match": [{ "group": "", "kind": "Secret" }],
+      "run": {
+        "type": "vscode",
+        "command": "k8sView.decodeSecret",
+        "args": [
+          {
+            "context": "${context}",
+            "group": "${group}",
+            "kind": "${kind}",
+            "namespace": "${namespace}",
+            "name": "${name}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "cronjob.trigger",
+      "title": "Trigger now",
+      "group": "CronJob",
+      "icon": "play",
+      "refreshAfter": true,
+      "match": [{ "group": "batch", "kind": "CronJob" }],
+      "run": {
+        "type": "process",
+        "command": "kubectl",
+        "args": [
+          "create",
+          "job",
+          "${name|trunc:41}-manual-${timestamp}",
+          "--from=cronjob/${name}",
+          "-n",
+          "${namespace}",
+          "--context",
+          "${context}"
+        ]
+      }
+    },
+    {
+      "id": "cronjob.suspend",
+      "title": "Suspend",
+      "group": "CronJob",
+      "icon": "debug-pause",
+      "dangerous": true,
+      "refreshAfter": true,
+      "match": [
+        { "group": "batch", "kind": "CronJob", "when": { "path": "$.spec.suspend", "op": "neq", "value": true } }
+      ],
+      "run": {
+        "type": "process",
+        "command": "kubectl",
+        "args": [
+          "patch",
+          "cronjob",
+          "${name}",
+          "--type=merge",
+          "-p",
+          "{\"spec\":{\"suspend\":true}}",
+          "-n",
+          "${namespace}",
+          "--context",
+          "${context}"
+        ]
+      }
+    },
+    {
+      "id": "cronjob.resume",
+      "title": "Resume",
+      "group": "CronJob",
+      "icon": "debug-continue",
+      "dangerous": true,
+      "refreshAfter": true,
+      "match": [
+        { "group": "batch", "kind": "CronJob", "when": { "path": "$.spec.suspend", "op": "eq", "value": true } }
+      ],
+      "run": {
+        "type": "process",
+        "command": "kubectl",
+        "args": [
+          "patch",
+          "cronjob",
+          "${name}",
+          "--type=merge",
+          "-p",
+          "{\"spec\":{\"suspend\":false}}",
+          "-n",
+          "${namespace}",
+          "--context",
+          "${context}"
+        ]
+      }
+    },
+    {
+      "id": "sa.canI",
+      "title": "Can I…? (list permissions)",
+      "group": "ServiceAccount",
+      "icon": "shield",
+      "match": [{ "group": "", "kind": "ServiceAccount" }],
+      "run": {
+        "type": "terminal",
+        "name": "can-i ${name}",
+        "command": "kubectl",
+        "args": [
+          "auth",
+          "can-i",
+          "--list",
+          "-n",
+          "${namespace}",
+          "--context",
+          "${context}",
+          "--as=system:serviceaccount:${namespace}:${name}"
+        ]
+      }
+    },
+    {
+      "id": "k8s.openInBrowser",
+      "title": "Open in browser",
+      "group": "Network",
+      "icon": "link-external",
+      // URLs from hostnames × paths; HTTPRoute reads its parent Gateway listeners for HTTPS/ports.
+      "match": [
+        { "group": "gateway.networking.k8s.io", "kind": "HTTPRoute" },
+        { "group": "networking.k8s.io", "kind": "Ingress" }
+      ],
+      "run": {
+        "type": "vscode",
+        "command": "k8sView.openInBrowser",
+        "args": [
+          {
+            "context": "${context}",
+            "group": "${group}",
+            "kind": "${kind}",
+            "namespace": "${namespace}",
+            "name": "${name}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "node.cordon",
+      "title": "Cordon",
+      "group": "Node",
+      "icon": "debug-pause",
+      "order": 1,
+      "dangerous": true,
+      "multi": "sequential",
+      "refreshAfter": true,
+      "confirm": "Cordon node ${name} on ${context}? New pods are no longer scheduled on it.",
+      "match": [
+        { "group": "", "kind": "Node", "when": { "path": "$.spec.unschedulable", "op": "neq", "value": true } }
+      ],
+      "run": { "type": "process", "command": "kubectl", "args": ["cordon", "${name}", "--context", "${context}"] }
+    },
+    {
+      "id": "node.uncordon",
+      "title": "Uncordon",
+      "group": "Node",
+      "icon": "debug-continue",
+      "order": 2,
+      "dangerous": true,
+      "multi": "sequential",
+      "refreshAfter": true,
+      "match": [{ "group": "", "kind": "Node", "when": { "path": "$.spec.unschedulable", "op": "eq", "value": true } }],
+      "run": { "type": "process", "command": "kubectl", "args": ["uncordon", "${name}", "--context", "${context}"] }
+    },
+    {
+      "id": "node.drain",
+      "title": "Drain…",
+      "group": "Node",
+      "icon": "arrow-circle-down",
+      "order": 3,
+      "dangerous": true,
+      "refreshAfter": true,
+      "confirm": "Drain node ${name} on ${context}? It is cordoned and its pods are evicted (timeout ${input:timeout}, ignore DaemonSets ${input:ignoreDaemonsets}, delete emptyDir data ${input:deleteEmptyDir}, force ${input:force}).",
+      "match": [{ "group": "", "kind": "Node" }],
+      "inputs": [
+        {
+          "id": "timeout",
+          "type": "pick",
+          "title": "Timeout before giving up (0s = wait forever)",
+          "options": ["5m", "10m", "30m", "1h", "0s"],
+          "default": "5m"
+        },
+        {
+          "id": "ignoreDaemonsets",
+          "type": "pick",
+          "title": "Ignore DaemonSet-managed pods? (--ignore-daemonsets; drain fails on them otherwise)",
+          "options": ["true", "false"],
+          "default": "true"
+        },
+        {
+          "id": "deleteEmptyDir",
+          "type": "pick",
+          "title": "Evict pods using emptyDir? (--delete-emptydir-data; their local data is lost)",
+          "options": ["false", "true"],
+          "default": "false"
+        },
+        {
+          "id": "force",
+          "type": "pick",
+          "title": "Force? (--force; also delete pods not managed by a controller)",
+          "options": ["false", "true"],
+          "default": "false"
+        },
+        {
+          "id": "gracePeriod",
+          "type": "prompt",
+          "title": "Grace period in seconds (-1 = each pod's own terminationGracePeriodSeconds)",
+          "default": "-1",
+          "pattern": "^-?\\d+$"
+        }
+      ],
+      // Terminal for monitoring eviction progress (Ctrl+C stops; node remains cordoned).
+      "run": {
+        "type": "terminal",
+        "name": "drain ${name}",
+        "command": "kubectl",
+        "args": [
+          "drain",
+          "${name}",
+          "--timeout=${input:timeout}",
+          "--ignore-daemonsets=${input:ignoreDaemonsets}",
+          "--delete-emptydir-data=${input:deleteEmptyDir}",
+          "--force=${input:force}",
+          "--grace-period=${input:gracePeriod}",
+          "--context",
+          "${context}"
+        ]
+      }
+    },
+    {
+      "id": "k8s.events",
+      "title": "Events",
+      "group": "Snippets",
+      "icon": "history",
+      "target": "namespace",
+      "run": {
+        "type": "terminal",
+        "name": "events ${namespace|default:all namespaces}",
+        "command": "kubectl",
+        "args": ["get", "events", "--sort-by=.lastTimestamp", "${namespaceFlag}", "--context", "${context}"]
+      }
+    },
+    {
+      "id": "snippet.findPods",
+      "title": "Find pods by label / annotation…",
+      "group": "Snippets",
+      "icon": "search",
+      "target": "namespace",
+      // Filter labels on the server, annotations on the client (unsupported by the API). Select a resulting pod to run the command.
+      "inputs": [
+        {
+          "id": "labels",
+          "type": "prompt",
+          "title": "Label selector (empty = any), e.g. app=web,tier!=cache,env in (dev,qa)",
+          "placeholder": "app=web"
+        },
+        {
+          "id": "annotations",
+          "type": "prompt",
+          "title": "Annotations (empty = any): key, key=value or key!=value, comma-separated",
+          "placeholder": "prometheus.io/scrape=true"
+        }
+      ],
+      "run": {
+        "type": "vscode",
+        "command": "k8sView.findPods",
+        "args": [
+          {
+            "context": "${context}",
+            "namespace": "${namespace}",
+            "labelSelector": "${input:labels}",
+            "annotation": "${input:annotations}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "snippet.containers",
+      "title": "Containers & images in use",
+      "group": "Snippets",
+      "icon": "package",
+      "target": "namespace",
+      "run": {
+        "type": "terminal",
+        "name": "containers ${namespace|default:all namespaces}",
+        "command": "kubectl",
+        "args": [
+          "get",
+          "pods",
+          "${namespaceFlag}",
+          "--context",
+          "${context}",
+          "--sort-by=.metadata.name",
+          "-o",
+          "custom-columns=NAMESPACE:.metadata.namespace,POD:.metadata.name,STATUS:.status.phase,CONTAINERS:.spec.containers[*].name,IMAGES:.spec.containers[*].image,INIT_IMAGES:.spec.initContainers[*].image"
+        ]
+      }
+    }
+  ]
+}

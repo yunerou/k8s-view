@@ -1,0 +1,344 @@
+{
+  "$schema": "../../schemas/k8s-view.schema.json",
+  "version": 1,
+  "views": [
+    {
+      "id": "fluxcd",
+      "title": "FluxCD",
+      "icon": "sync",
+      "order": 10,
+      "requires": ["kustomize.toolkit.fluxcd.io"],
+      "sections": [
+        {
+          "id": "kustomizations",
+          "title": "Kustomizations",
+          "icon": "symbol-namespace",
+          "resources": [{ "group": "kustomize.toolkit.fluxcd.io", "kind": "Kustomization" }],
+          "status": { "preset": "readyCondition" },
+          "description": "${$.status.lastAppliedRevision}",
+          "columns": [
+            { "title": "Ready", "path": "$.status.conditions[?(@.type=='Ready')].status", "render": "status" },
+            { "title": "Message", "path": "$.status.conditions[?(@.type=='Ready')].message", "width": 360 },
+            { "title": "Revision", "path": "$.status.lastAppliedRevision" },
+            { "title": "Suspended", "path": "$.spec.suspend", "render": "boolean", "default": "No" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "source",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.sourceRef",
+                "group": { "path": "$.apiVersion", "default": "source.toolkit.fluxcd.io" },
+                "kind": { "path": "$.kind", "default": "GitRepository" },
+                "namespace": "$.namespace"
+              }
+            }
+          ]
+        },
+        {
+          "id": "helmreleases",
+          "title": "HelmReleases",
+          "icon": "package",
+          "resources": [{ "group": "helm.toolkit.fluxcd.io", "kind": "HelmRelease" }],
+          "status": { "preset": "readyCondition" },
+          "description": "${$.status.history[0].chartVersion}",
+          "columns": [
+            { "title": "Ready", "path": "$.status.conditions[?(@.type=='Ready')].status", "render": "status" },
+            { "title": "Message", "path": "$.status.conditions[?(@.type=='Ready')].message", "width": 360 },
+            { "title": "Chart", "template": "${$.spec.chart.spec.chart}${$.spec.chartRef.name}" },
+            { "title": "Version", "path": "$.status.history[0].chartVersion" },
+            { "title": "Suspended", "path": "$.spec.suspend", "render": "boolean", "default": "No" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "chart-source",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.chart.spec.sourceRef",
+                "group": { "path": "$.apiVersion", "default": "source.toolkit.fluxcd.io" },
+                "kind": { "path": "$.kind", "default": "HelmRepository" },
+                "namespace": "$.namespace"
+              }
+            },
+            {
+              "id": "chart-ref",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.chartRef",
+                "group": { "path": "$.apiVersion", "default": "source.toolkit.fluxcd.io" },
+                "kind": { "path": "$.kind", "default": "OCIRepository" },
+                "namespace": "$.namespace"
+              }
+            }
+          ]
+        },
+        {
+          "id": "sources",
+          "title": "Sources",
+          "icon": "repo",
+          "groupBy": "kind",
+          "status": { "preset": "readyCondition" },
+          "description": "${$.status.artifact.revision}",
+          "resources": [
+            { "group": "source.toolkit.fluxcd.io", "kind": "GitRepository" },
+            { "group": "source.toolkit.fluxcd.io", "kind": "OCIRepository" },
+            { "group": "source.toolkit.fluxcd.io", "kind": "HelmRepository" },
+            { "group": "source.toolkit.fluxcd.io", "kind": "HelmChart" },
+            { "group": "source.toolkit.fluxcd.io", "kind": "Bucket" },
+            { "group": "source.toolkit.fluxcd.io", "kind": "ExternalArtifact" }
+          ],
+          "columns": [
+            { "title": "Ready", "path": "$.status.conditions[?(@.type=='Ready')].status", "render": "status" },
+            { "title": "Message", "path": "$.status.conditions[?(@.type=='Ready')].message", "width": 360 },
+            { "title": "URL", "path": "$.spec.url" },
+            { "title": "Revision", "path": "$.status.artifact.revision" },
+            { "title": "Suspended", "path": "$.spec.suspend", "render": "boolean", "default": "No" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ]
+        },
+        {
+          "id": "notifications",
+          "title": "Notifications",
+          "icon": "bell",
+          "groupBy": "kind",
+          "status": { "preset": "readyCondition" },
+          "resources": [
+            { "group": "notification.toolkit.fluxcd.io", "kind": "Alert" },
+            { "group": "notification.toolkit.fluxcd.io", "kind": "Provider" },
+            { "group": "notification.toolkit.fluxcd.io", "kind": "Receiver" }
+          ],
+          "columns": [
+            { "title": "Type", "path": "$.spec.type" },
+            { "title": "Suspended", "path": "$.spec.suspend", "render": "boolean", "default": "No" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ]
+        },
+        {
+          "id": "image-automation",
+          "title": "Image automation",
+          "icon": "file-media",
+          "groupBy": "kind",
+          "status": { "preset": "readyCondition" },
+          "resources": [
+            { "group": "image.toolkit.fluxcd.io", "kind": "ImageRepository" },
+            { "group": "image.toolkit.fluxcd.io", "kind": "ImagePolicy" },
+            { "group": "image.toolkit.fluxcd.io", "kind": "ImageUpdateAutomation" }
+          ],
+          "columns": [
+            { "title": "Ready", "path": "$.status.conditions[?(@.type=='Ready')].status", "render": "status" },
+            { "title": "Message", "path": "$.status.conditions[?(@.type=='Ready')].message", "width": 360 },
+            { "title": "Image", "template": "${$.spec.image}${$.status.latestRef.tag}" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ]
+        }
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "id": "flux.reconcile",
+      "title": "Flux: Reconcile with source",
+      "group": "Flux",
+      "icon": "sync",
+      "multi": "sequential",
+      "refreshAfter": true,
+      "match": [
+        { "group": "kustomize.toolkit.fluxcd.io", "kind": "Kustomization" },
+        { "group": "helm.toolkit.fluxcd.io", "kind": "HelmRelease" }
+      ],
+      "run": {
+        "type": "process",
+        "command": "flux",
+        "args": [
+          "reconcile",
+          "${kindLower}",
+          "${name}",
+          "-n",
+          "${namespace}",
+          "--context",
+          "${context}",
+          "--with-source"
+        ]
+      }
+    },
+    {
+      "id": "flux.reconcile-git",
+      "title": "Flux: Reconcile source",
+      "group": "Flux",
+      "icon": "sync",
+      "multi": "sequential",
+      "refreshAfter": true,
+      "match": [{ "group": "source.toolkit.fluxcd.io", "kind": "GitRepository" }],
+      "run": {
+        "type": "process",
+        "command": "flux",
+        "args": ["reconcile", "source", "git", "${name}", "-n", "${namespace}", "--context", "${context}"]
+      }
+    },
+    {
+      "id": "flux.reconcile-oci",
+      "title": "Flux: Reconcile source",
+      "group": "Flux",
+      "icon": "sync",
+      "multi": "sequential",
+      "refreshAfter": true,
+      "match": [{ "group": "source.toolkit.fluxcd.io", "kind": "OCIRepository" }],
+      "run": {
+        "type": "process",
+        "command": "flux",
+        "args": ["reconcile", "source", "oci", "${name}", "-n", "${namespace}", "--context", "${context}"]
+      }
+    },
+    {
+      "id": "flux.reconcile-helm",
+      "title": "Flux: Reconcile source",
+      "group": "Flux",
+      "icon": "sync",
+      "multi": "sequential",
+      "refreshAfter": true,
+      "match": [{ "group": "source.toolkit.fluxcd.io", "kind": "HelmRepository" }],
+      "run": {
+        "type": "process",
+        "command": "flux",
+        "args": ["reconcile", "source", "helm", "${name}", "-n", "${namespace}", "--context", "${context}"]
+      }
+    },
+    {
+      "id": "flux.reconcile-chart",
+      "title": "Flux: Reconcile source",
+      "group": "Flux",
+      "icon": "sync",
+      "multi": "sequential",
+      "refreshAfter": true,
+      "match": [{ "group": "source.toolkit.fluxcd.io", "kind": "HelmChart" }],
+      "run": {
+        "type": "process",
+        "command": "flux",
+        "args": ["reconcile", "source", "chart", "${name}", "-n", "${namespace}", "--context", "${context}"]
+      }
+    },
+    {
+      "id": "flux.reconcile-bucket",
+      "title": "Flux: Reconcile source",
+      "group": "Flux",
+      "icon": "sync",
+      "multi": "sequential",
+      "refreshAfter": true,
+      "match": [{ "group": "source.toolkit.fluxcd.io", "kind": "Bucket" }],
+      "run": {
+        "type": "process",
+        "command": "flux",
+        "args": ["reconcile", "source", "bucket", "${name}", "-n", "${namespace}", "--context", "${context}"]
+      }
+    },
+    {
+      "id": "flux.suspend",
+      "title": "Flux: Suspend",
+      "group": "Flux",
+      "icon": "debug-pause",
+      "dangerous": true,
+      "refreshAfter": true,
+      "confirm": "Suspend ${kind} ${namespace}/${name} on ${context}?",
+      "match": [
+        {
+          "group": "kustomize.toolkit.fluxcd.io",
+          "kind": "Kustomization",
+          "when": { "path": "$.spec.suspend", "op": "neq", "value": true }
+        },
+        {
+          "group": "helm.toolkit.fluxcd.io",
+          "kind": "HelmRelease",
+          "when": { "path": "$.spec.suspend", "op": "neq", "value": true }
+        }
+      ],
+      "run": {
+        "type": "process",
+        "command": "flux",
+        "args": ["suspend", "${kindLower}", "${name}", "-n", "${namespace}", "--context", "${context}"]
+      }
+    },
+    {
+      "id": "flux.resume",
+      "title": "Flux: Resume",
+      "group": "Flux",
+      "icon": "debug-continue",
+      "dangerous": true,
+      "refreshAfter": true,
+      "match": [
+        {
+          "group": "kustomize.toolkit.fluxcd.io",
+          "kind": "Kustomization",
+          "when": { "path": "$.spec.suspend", "op": "eq", "value": true }
+        },
+        {
+          "group": "helm.toolkit.fluxcd.io",
+          "kind": "HelmRelease",
+          "when": { "path": "$.spec.suspend", "op": "eq", "value": true }
+        }
+      ],
+      "run": {
+        "type": "process",
+        "command": "flux",
+        "args": ["resume", "${kindLower}", "${name}", "-n", "${namespace}", "--context", "${context}"]
+      }
+    },
+    {
+      "id": "flux.helmValues",
+      "title": "Show values",
+      "group": "Helm",
+      "icon": "symbol-property",
+      "order": 1,
+      // Read Helm releases from storage Secrets (no helm CLI required); user values = spec.values + valuesFrom.
+      "match": [{ "group": "helm.toolkit.fluxcd.io", "kind": "HelmRelease" }],
+      "run": {
+        "type": "vscode",
+        "command": "k8sView.helmShowValues",
+        "args": [
+          {
+            "context": "${context}",
+            "group": "${group}",
+            "kind": "${kind}",
+            "namespace": "${namespace}",
+            "name": "${name}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "flux.helmDefaultValues",
+      "title": "Show default values",
+      "group": "Helm",
+      "icon": "symbol-constant",
+      "order": 2,
+      "match": [{ "group": "helm.toolkit.fluxcd.io", "kind": "HelmRelease" }],
+      "run": {
+        "type": "vscode",
+        "command": "k8sView.helmShowDefaultValues",
+        "args": [
+          {
+            "context": "${context}",
+            "group": "${group}",
+            "kind": "${kind}",
+            "namespace": "${namespace}",
+            "name": "${name}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "flux.get-all",
+      "title": "Flux: get all",
+      "group": "Flux",
+      "icon": "list-flat",
+      "target": "context",
+      "run": {
+        "type": "terminal",
+        "name": "flux get all",
+        "command": "flux",
+        "args": ["get", "all", "-A", "--context", "${context}"]
+      }
+    }
+  ]
+}

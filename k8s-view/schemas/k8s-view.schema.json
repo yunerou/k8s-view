@@ -1,0 +1,2667 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "views": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "icon": {
+                "description": "Codicon name",
+                "type": "string"
+              },
+              "requires": {
+                "description": "API groups that must exist on the cluster",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "enabled": {
+                "default": true,
+                "type": "boolean"
+              },
+              "order": {
+                "type": "number"
+              },
+              "portForwards": {
+                "default": false,
+                "description": "Show the running port-forwards of the context at the top of the view",
+                "type": "boolean"
+              },
+              "sections": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "icon": {
+                      "description": "Codicon name",
+                      "type": "string"
+                    },
+                    "resources": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "group": {
+                            "default": "",
+                            "description": "API group; \"\" is the core group",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "version": {
+                            "description": "Omit to let discovery pick the preferred version",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "filter": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "description": "JSONPath, e.g. $.status.phase"
+                            },
+                            "op": {
+                              "type": "string",
+                              "enum": [
+                                "eq",
+                                "neq",
+                                "in",
+                                "exists",
+                                "notExists",
+                                "regex",
+                                "ownedBy",
+                                "notOwnedBy"
+                              ]
+                            },
+                            "value": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": [
+                                      "string",
+                                      "number",
+                                      "boolean"
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "op"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": {
+                                "type": "string",
+                                "description": "JSONPath, e.g. $.status.phase"
+                              },
+                              "op": {
+                                "type": "string",
+                                "enum": [
+                                  "eq",
+                                  "neq",
+                                  "in",
+                                  "exists",
+                                  "notExists",
+                                  "regex",
+                                  "ownedBy",
+                                  "notOwnedBy"
+                                ]
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  },
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": [
+                                        "string",
+                                        "number",
+                                        "boolean"
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "op"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      ],
+                      "description": "Several conditions = AND"
+                    },
+                    "columns": {
+                      "default": [],
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "description": "Defaults to the slug of title",
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "render": {
+                                "default": "text",
+                                "type": "string",
+                                "enum": [
+                                  "text",
+                                  "age",
+                                  "status",
+                                  "boolean",
+                                  "count",
+                                  "labels",
+                                  "quantity",
+                                  "badge",
+                                  "cpu",
+                                  "memory",
+                                  "percentage"
+                                ]
+                              },
+                              "default": {
+                                "description": "Text shown when the value is empty",
+                                "type": "string"
+                              },
+                              "width": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "hidden": {
+                                "default": false,
+                                "type": "boolean"
+                              },
+                              "path": {
+                                "type": "string",
+                                "description": "JSONPath, e.g. $.status.phase"
+                              }
+                            },
+                            "required": [
+                              "title",
+                              "path"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "description": "Defaults to the slug of title",
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "render": {
+                                "default": "text",
+                                "type": "string",
+                                "enum": [
+                                  "text",
+                                  "age",
+                                  "status",
+                                  "boolean",
+                                  "count",
+                                  "labels",
+                                  "quantity",
+                                  "badge",
+                                  "cpu",
+                                  "memory",
+                                  "percentage"
+                                ]
+                              },
+                              "default": {
+                                "description": "Text shown when the value is empty",
+                                "type": "string"
+                              },
+                              "width": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "hidden": {
+                                "default": false,
+                                "type": "boolean"
+                              },
+                              "template": {
+                                "type": "string",
+                                "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                              }
+                            },
+                            "required": [
+                              "title",
+                              "template"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "preset": {
+                              "type": "string",
+                              "enum": [
+                                "readyCondition",
+                                "pod",
+                                "replicas",
+                                "job"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "preset"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "rules": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "when": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "path": {
+                                            "type": "string",
+                                            "description": "JSONPath, e.g. $.status.phase"
+                                          },
+                                          "op": {
+                                            "type": "string",
+                                            "enum": [
+                                              "eq",
+                                              "neq",
+                                              "in",
+                                              "exists",
+                                              "notExists",
+                                              "regex",
+                                              "ownedBy",
+                                              "notOwnedBy"
+                                            ]
+                                          },
+                                          "value": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": [
+                                                    "string",
+                                                    "number",
+                                                    "boolean"
+                                                  ]
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "op"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "path": {
+                                              "type": "string",
+                                              "description": "JSONPath, e.g. $.status.phase"
+                                            },
+                                            "op": {
+                                              "type": "string",
+                                              "enum": [
+                                                "eq",
+                                                "neq",
+                                                "in",
+                                                "exists",
+                                                "notExists",
+                                                "regex",
+                                                "ownedBy",
+                                                "notOwnedBy"
+                                              ]
+                                            },
+                                            "value": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "boolean"
+                                                },
+                                                {
+                                                  "type": "null"
+                                                },
+                                                {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": [
+                                                      "string",
+                                                      "number",
+                                                      "boolean"
+                                                    ]
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "op"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      }
+                                    ],
+                                    "description": "Several conditions = AND"
+                                  },
+                                  "level": {
+                                    "type": "string",
+                                    "enum": [
+                                      "ok",
+                                      "warning",
+                                      "error",
+                                      "progress",
+                                      "unknown"
+                                    ]
+                                  },
+                                  "summary": {
+                                    "description": "Short status text shown in the tree description and tooltip",
+                                    "type": "string"
+                                  },
+                                  "icon": {
+                                    "description": "Codicon of the resource in the tree when this rule matches",
+                                    "type": "string"
+                                  },
+                                  "color": {
+                                    "description": "Theme color id of the tree icon (e.g. \"disabledForeground\"); defaults to the color of the level",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "when",
+                                  "level"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "default": {
+                              "default": "unknown",
+                              "type": "string",
+                              "enum": [
+                                "ok",
+                                "warning",
+                                "error",
+                                "progress",
+                                "unknown"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "rules"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "label": {
+                      "description": "Label in the tree instead of the resource name",
+                      "type": "string"
+                    },
+                    "description": {
+                      "description": "Shown next to the name in the tree",
+                      "type": "string"
+                    },
+                    "children": {
+                      "default": [],
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/definitions/__schema0"
+                      }
+                    },
+                    "groupBy": {
+                      "type": "string",
+                      "description": "\"kind\", \"namespace\", \"status\", \"label:<key>\" or a JSONPath"
+                    },
+                    "sort": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "by": {
+                              "type": "string"
+                            },
+                            "order": {
+                              "default": "asc",
+                              "type": "string",
+                              "enum": [
+                                "asc",
+                                "desc"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "by"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "allNamespaces": {
+                      "default": false,
+                      "description": "List the resources of every namespace, whatever namespace is selected",
+                      "type": "boolean"
+                    },
+                    "hidden": {
+                      "default": false,
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "resources"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "sections"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "extends": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+              },
+              "id": {
+                "description": "Defaults to the extended id",
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+              },
+              "title": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "requires": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "order": {
+                "type": "number"
+              },
+              "portForwards": {
+                "type": "boolean"
+              },
+              "sections": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "icon": {
+                      "type": "string"
+                    },
+                    "resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "group": {
+                            "default": "",
+                            "description": "API group; \"\" is the core group",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "version": {
+                            "description": "Omit to let discovery pick the preferred version",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "filter": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "description": "JSONPath, e.g. $.status.phase"
+                            },
+                            "op": {
+                              "type": "string",
+                              "enum": [
+                                "eq",
+                                "neq",
+                                "in",
+                                "exists",
+                                "notExists",
+                                "regex",
+                                "ownedBy",
+                                "notOwnedBy"
+                              ]
+                            },
+                            "value": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": [
+                                      "string",
+                                      "number",
+                                      "boolean"
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "op"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": {
+                                "type": "string",
+                                "description": "JSONPath, e.g. $.status.phase"
+                              },
+                              "op": {
+                                "type": "string",
+                                "enum": [
+                                  "eq",
+                                  "neq",
+                                  "in",
+                                  "exists",
+                                  "notExists",
+                                  "regex",
+                                  "ownedBy",
+                                  "notOwnedBy"
+                                ]
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  },
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": [
+                                        "string",
+                                        "number",
+                                        "boolean"
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "op"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      ],
+                      "description": "Several conditions = AND"
+                    },
+                    "columns": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "render": {
+                            "type": "string",
+                            "enum": [
+                              "text",
+                              "age",
+                              "status",
+                              "boolean",
+                              "count",
+                              "labels",
+                              "quantity",
+                              "badge",
+                              "cpu",
+                              "memory",
+                              "percentage"
+                            ]
+                          },
+                          "default": {
+                            "type": "string"
+                          },
+                          "width": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "hidden": {
+                            "type": "boolean"
+                          },
+                          "path": {
+                            "type": "string",
+                            "description": "JSONPath, e.g. $.status.phase"
+                          },
+                          "template": {
+                            "type": "string",
+                            "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                          },
+                          "remove": {
+                            "description": "Remove the inherited item with this id",
+                            "type": "boolean"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "preset": {
+                              "type": "string",
+                              "enum": [
+                                "readyCondition",
+                                "pod",
+                                "replicas",
+                                "job"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "preset"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "rules": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "when": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "path": {
+                                            "type": "string",
+                                            "description": "JSONPath, e.g. $.status.phase"
+                                          },
+                                          "op": {
+                                            "type": "string",
+                                            "enum": [
+                                              "eq",
+                                              "neq",
+                                              "in",
+                                              "exists",
+                                              "notExists",
+                                              "regex",
+                                              "ownedBy",
+                                              "notOwnedBy"
+                                            ]
+                                          },
+                                          "value": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              },
+                                              {
+                                                "type": "array",
+                                                "items": {
+                                                  "type": [
+                                                    "string",
+                                                    "number",
+                                                    "boolean"
+                                                  ]
+                                                }
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "op"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "path": {
+                                              "type": "string",
+                                              "description": "JSONPath, e.g. $.status.phase"
+                                            },
+                                            "op": {
+                                              "type": "string",
+                                              "enum": [
+                                                "eq",
+                                                "neq",
+                                                "in",
+                                                "exists",
+                                                "notExists",
+                                                "regex",
+                                                "ownedBy",
+                                                "notOwnedBy"
+                                              ]
+                                            },
+                                            "value": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "boolean"
+                                                },
+                                                {
+                                                  "type": "null"
+                                                },
+                                                {
+                                                  "type": "array",
+                                                  "items": {
+                                                    "type": [
+                                                      "string",
+                                                      "number",
+                                                      "boolean"
+                                                    ]
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "op"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      }
+                                    ],
+                                    "description": "Several conditions = AND"
+                                  },
+                                  "level": {
+                                    "type": "string",
+                                    "enum": [
+                                      "ok",
+                                      "warning",
+                                      "error",
+                                      "progress",
+                                      "unknown"
+                                    ]
+                                  },
+                                  "summary": {
+                                    "description": "Short status text shown in the tree description and tooltip",
+                                    "type": "string"
+                                  },
+                                  "icon": {
+                                    "description": "Codicon of the resource in the tree when this rule matches",
+                                    "type": "string"
+                                  },
+                                  "color": {
+                                    "description": "Theme color id of the tree icon (e.g. \"disabledForeground\"); defaults to the color of the level",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "when",
+                                  "level"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "default": {
+                              "default": "unknown",
+                              "type": "string",
+                              "enum": [
+                                "ok",
+                                "warning",
+                                "error",
+                                "progress",
+                                "unknown"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "rules"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                    },
+                    "description": {
+                      "type": "string",
+                      "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                    },
+                    "children": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                          },
+                          "remove": {
+                            "description": "Remove the inherited item with this id",
+                            "type": "boolean"
+                          }
+                        },
+                        "additionalProperties": {}
+                      }
+                    },
+                    "groupBy": {
+                      "type": "string",
+                      "description": "\"kind\", \"namespace\", \"status\", \"label:<key>\" or a JSONPath"
+                    },
+                    "sort": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "by": {
+                              "type": "string"
+                            },
+                            "order": {
+                              "default": "asc",
+                              "type": "string",
+                              "enum": [
+                                "asc",
+                                "desc"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "by"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    "allNamespaces": {
+                      "type": "boolean"
+                    },
+                    "hidden": {
+                      "type": "boolean"
+                    },
+                    "remove": {
+                      "description": "Remove the inherited item with this id",
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "extends"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "commands": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "group": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "target": {
+                "default": "resource",
+                "type": "string",
+                "enum": [
+                  "resource",
+                  "namespace",
+                  "context"
+                ]
+              },
+              "match": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "group": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Kind, or \"*\" for any kind"
+                    },
+                    "when": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "description": "JSONPath, e.g. $.status.phase"
+                            },
+                            "op": {
+                              "type": "string",
+                              "enum": [
+                                "eq",
+                                "neq",
+                                "in",
+                                "exists",
+                                "notExists",
+                                "regex",
+                                "ownedBy",
+                                "notOwnedBy"
+                              ]
+                            },
+                            "value": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": [
+                                      "string",
+                                      "number",
+                                      "boolean"
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "op"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": {
+                                "type": "string",
+                                "description": "JSONPath, e.g. $.status.phase"
+                              },
+                              "op": {
+                                "type": "string",
+                                "enum": [
+                                  "eq",
+                                  "neq",
+                                  "in",
+                                  "exists",
+                                  "notExists",
+                                  "regex",
+                                  "ownedBy",
+                                  "notOwnedBy"
+                                ]
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  },
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": [
+                                        "string",
+                                        "number",
+                                        "boolean"
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "op"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      ],
+                      "description": "Several conditions = AND"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "inputs": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                        },
+                        "type": {
+                          "type": "string",
+                          "const": "pick"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "from": {
+                          "description": "JSONPath on the resource producing the options",
+                          "type": "string"
+                        },
+                        "fromKind": {
+                          "description": "Pick the name of a resource of this kind in the namespace (works for snippets)",
+                          "type": "object",
+                          "properties": {
+                            "group": {
+                              "default": "",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "default": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                        },
+                        "type": {
+                          "type": "string",
+                          "const": "prompt"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "default": {
+                          "description": "Initial value; without it the last value entered is offered",
+                          "type": "string"
+                        },
+                        "placeholder": {
+                          "type": "string"
+                        },
+                        "pattern": {
+                          "description": "Regular expression the value must match",
+                          "type": "string"
+                        },
+                        "secret": {
+                          "default": false,
+                          "description": "Mask the value while typing and never remember it",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                        },
+                        "type": {
+                          "type": "string",
+                          "const": "confirm"
+                        },
+                        "title": {
+                          "type": "string",
+                          "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "run": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "process"
+                      },
+                      "command": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "args": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                        }
+                      },
+                      "cwd": {
+                        "type": "string",
+                        "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                      },
+                      "env": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                        }
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "command"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "terminal"
+                      },
+                      "command": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "args": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                        }
+                      },
+                      "cwd": {
+                        "type": "string",
+                        "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                      },
+                      "env": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                        }
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "command"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "kubectl"
+                      },
+                      "args": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                        }
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "vscode"
+                      },
+                      "command": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "args": {
+                        "default": [],
+                        "type": "array",
+                        "items": {}
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "command"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "batch"
+                      },
+                      "operation": {
+                        "type": "string",
+                        "enum": [
+                          "copyNames",
+                          "delete",
+                          "restart",
+                          "scale",
+                          "suspend",
+                          "resume",
+                          "trigger",
+                          "cordon",
+                          "uncordon"
+                        ]
+                      },
+                      "replicas": {
+                        "type": "string",
+                        "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "operation"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "multi": {
+                "default": "none",
+                "type": "string",
+                "enum": [
+                  "none",
+                  "sequential",
+                  "parallel"
+                ]
+              },
+              "refreshAfter": {
+                "default": false,
+                "type": "boolean"
+              },
+              "dangerous": {
+                "default": false,
+                "type": "boolean"
+              },
+              "confirm": {
+                "description": "Message of the confirmation dialog",
+                "type": "string"
+              },
+              "skipConfirm": {
+                "default": false,
+                "description": "Only honoured in user config files",
+                "type": "boolean"
+              },
+              "enabled": {
+                "default": true,
+                "type": "boolean"
+              },
+              "order": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "run"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "extends": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+              },
+              "title": {
+                "type": "string"
+              },
+              "group": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "match": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "group": {
+                      "default": "",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "description": "Kind, or \"*\" for any kind"
+                    },
+                    "when": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "path": {
+                              "type": "string",
+                              "description": "JSONPath, e.g. $.status.phase"
+                            },
+                            "op": {
+                              "type": "string",
+                              "enum": [
+                                "eq",
+                                "neq",
+                                "in",
+                                "exists",
+                                "notExists",
+                                "regex",
+                                "ownedBy",
+                                "notOwnedBy"
+                              ]
+                            },
+                            "value": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": [
+                                      "string",
+                                      "number",
+                                      "boolean"
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "op"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": {
+                                "type": "string",
+                                "description": "JSONPath, e.g. $.status.phase"
+                              },
+                              "op": {
+                                "type": "string",
+                                "enum": [
+                                  "eq",
+                                  "neq",
+                                  "in",
+                                  "exists",
+                                  "notExists",
+                                  "regex",
+                                  "ownedBy",
+                                  "notOwnedBy"
+                                ]
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  },
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": [
+                                        "string",
+                                        "number",
+                                        "boolean"
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "op"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      ],
+                      "description": "Several conditions = AND"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                        },
+                        "type": {
+                          "type": "string",
+                          "const": "pick"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "from": {
+                          "description": "JSONPath on the resource producing the options",
+                          "type": "string"
+                        },
+                        "fromKind": {
+                          "description": "Pick the name of a resource of this kind in the namespace (works for snippets)",
+                          "type": "object",
+                          "properties": {
+                            "group": {
+                              "default": "",
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "kind"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "default": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                        },
+                        "type": {
+                          "type": "string",
+                          "const": "prompt"
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "default": {
+                          "description": "Initial value; without it the last value entered is offered",
+                          "type": "string"
+                        },
+                        "placeholder": {
+                          "type": "string"
+                        },
+                        "pattern": {
+                          "description": "Regular expression the value must match",
+                          "type": "string"
+                        },
+                        "secret": {
+                          "default": false,
+                          "description": "Mask the value while typing and never remember it",
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+                        },
+                        "type": {
+                          "type": "string",
+                          "const": "confirm"
+                        },
+                        "title": {
+                          "type": "string",
+                          "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              },
+              "run": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "process"
+                      },
+                      "command": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "args": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                        }
+                      },
+                      "cwd": {
+                        "type": "string",
+                        "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                      },
+                      "env": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                        }
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "command"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "terminal"
+                      },
+                      "command": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "args": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                        }
+                      },
+                      "cwd": {
+                        "type": "string",
+                        "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                      },
+                      "env": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                        }
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "command"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "kubectl"
+                      },
+                      "args": {
+                        "default": [],
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                        }
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "vscode"
+                      },
+                      "command": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "args": {
+                        "default": [],
+                        "type": "array",
+                        "items": {}
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "command"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "batch"
+                      },
+                      "operation": {
+                        "type": "string",
+                        "enum": [
+                          "copyNames",
+                          "delete",
+                          "restart",
+                          "scale",
+                          "suspend",
+                          "resume",
+                          "trigger",
+                          "cordon",
+                          "uncordon"
+                        ]
+                      },
+                      "replicas": {
+                        "type": "string",
+                        "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "operation"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "multi": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "sequential",
+                  "parallel"
+                ]
+              },
+              "refreshAfter": {
+                "type": "boolean"
+              },
+              "dangerous": {
+                "type": "boolean"
+              },
+              "confirm": {
+                "type": "string",
+                "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+              },
+              "skipConfirm": {
+                "type": "boolean"
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "order": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "extends"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "hotkeys": {
+      "type": "object",
+      "properties": {
+        "bindings": {
+          "description": "Table hotkeys; they replace defaults on the same key",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Key chord: modifiers (ctrl, alt/option, shift, cmd/meta) joined with '+', e.g. 'shift+1', 'cmd+r'"
+              },
+              "action": {
+                "description": "Built-in table action; 'none' removes a default binding",
+                "type": "string",
+                "enum": [
+                  "prevSection",
+                  "nextSection",
+                  "focusFilter",
+                  "toggleFilters",
+                  "nextError",
+                  "prevError",
+                  "details",
+                  "manifest",
+                  "commands",
+                  "runLast",
+                  "refresh",
+                  "pickNamespace",
+                  "pickView",
+                  "help",
+                  "none"
+                ]
+              },
+              "view": {
+                "description": "Switch the table to this view id",
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+              },
+              "favorite": {
+                "description": "Switch to favorite view N (1-9) of the setting k8sView.views.favorites",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9
+              },
+              "namespace": {
+                "description": "Select this namespace",
+                "type": "string"
+              },
+              "allNamespaces": {
+                "description": "Select all namespaces",
+                "type": "boolean",
+                "const": true
+              },
+              "command": {
+                "description": "Run this command id on the selected rows",
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false,
+      "description": "Hotkeys of the table view, active when hotkey mode is ON (command 'K8s View: Toggle hotkeys')"
+    }
+  },
+  "required": [
+    "version"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+        },
+        "title": {
+          "type": "string"
+        },
+        "relation": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "ownerRef"
+                },
+                "group": {
+                  "default": "",
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "kind"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "labelSelector"
+                },
+                "group": {
+                  "default": "",
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "selector": {
+                  "type": "string",
+                  "description": "JSONPath, e.g. $.status.phase"
+                }
+              },
+              "required": [
+                "type",
+                "kind",
+                "selector"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "fieldRef"
+                },
+                "items": {
+                  "type": "string",
+                  "description": "JSONPath, e.g. $.status.phase"
+                },
+                "group": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "description": "JSONPath, e.g. $.status.phase"
+                    },
+                    "default": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "default"
+                  ],
+                  "additionalProperties": false
+                },
+                "kind": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string",
+                      "description": "JSONPath, e.g. $.status.phase"
+                    },
+                    "default": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "default"
+                  ],
+                  "additionalProperties": false
+                },
+                "name": {
+                  "default": "$.name",
+                  "type": "string",
+                  "description": "JSONPath, e.g. $.status.phase"
+                },
+                "namespace": {
+                  "default": "$self",
+                  "description": "JSONPath on the reference item, or \"$self\" for the parent namespace",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "items",
+                "group",
+                "kind"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "reverseFieldRef"
+                },
+                "group": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "string",
+                  "description": "JSONPath, e.g. $.status.phase"
+                },
+                "match": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                    },
+                    "namespace": {
+                      "type": "string",
+                      "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "allNamespaces": {
+                  "default": false,
+                  "description": "Look for children in every namespace, not only the selected one",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "type",
+                "group",
+                "kind",
+                "items",
+                "match"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "field"
+                },
+                "items": {
+                  "type": "string",
+                  "description": "JSONPath, e.g. $.status.phase"
+                },
+                "label": {
+                  "type": "string",
+                  "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                },
+                "description": {
+                  "type": "string",
+                  "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+                },
+                "icon": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "items",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "filter": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string",
+                  "description": "JSONPath, e.g. $.status.phase"
+                },
+                "op": {
+                  "type": "string",
+                  "enum": [
+                    "eq",
+                    "neq",
+                    "in",
+                    "exists",
+                    "notExists",
+                    "regex",
+                    "ownedBy",
+                    "notOwnedBy"
+                  ]
+                },
+                "value": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "op"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "JSONPath, e.g. $.status.phase"
+                  },
+                  "op": {
+                    "type": "string",
+                    "enum": [
+                      "eq",
+                      "neq",
+                      "in",
+                      "exists",
+                      "notExists",
+                      "regex",
+                      "ownedBy",
+                      "notOwnedBy"
+                    ]
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "op"
+                ],
+                "additionalProperties": false
+              }
+            }
+          ],
+          "description": "Several conditions = AND"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "preset": {
+                  "type": "string",
+                  "enum": [
+                    "readyCondition",
+                    "pod",
+                    "replicas",
+                    "job"
+                  ]
+                }
+              },
+              "required": [
+                "preset"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "rules": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "when": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "path": {
+                                "type": "string",
+                                "description": "JSONPath, e.g. $.status.phase"
+                              },
+                              "op": {
+                                "type": "string",
+                                "enum": [
+                                  "eq",
+                                  "neq",
+                                  "in",
+                                  "exists",
+                                  "notExists",
+                                  "regex",
+                                  "ownedBy",
+                                  "notOwnedBy"
+                                ]
+                              },
+                              "value": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  },
+                                  {
+                                    "type": "array",
+                                    "items": {
+                                      "type": [
+                                        "string",
+                                        "number",
+                                        "boolean"
+                                      ]
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "op"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "path": {
+                                  "type": "string",
+                                  "description": "JSONPath, e.g. $.status.phase"
+                                },
+                                "op": {
+                                  "type": "string",
+                                  "enum": [
+                                    "eq",
+                                    "neq",
+                                    "in",
+                                    "exists",
+                                    "notExists",
+                                    "regex",
+                                    "ownedBy",
+                                    "notOwnedBy"
+                                  ]
+                                },
+                                "value": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    },
+                                    {
+                                      "type": "null"
+                                    },
+                                    {
+                                      "type": "array",
+                                      "items": {
+                                        "type": [
+                                          "string",
+                                          "number",
+                                          "boolean"
+                                        ]
+                                      }
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "op"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        ],
+                        "description": "Several conditions = AND"
+                      },
+                      "level": {
+                        "type": "string",
+                        "enum": [
+                          "ok",
+                          "warning",
+                          "error",
+                          "progress",
+                          "unknown"
+                        ]
+                      },
+                      "summary": {
+                        "description": "Short status text shown in the tree description and tooltip",
+                        "type": "string"
+                      },
+                      "icon": {
+                        "description": "Codicon of the resource in the tree when this rule matches",
+                        "type": "string"
+                      },
+                      "color": {
+                        "description": "Theme color id of the tree icon (e.g. \"disabledForeground\"); defaults to the color of the level",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "when",
+                      "level"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "default": {
+                  "default": "unknown",
+                  "type": "string",
+                  "enum": [
+                    "ok",
+                    "warning",
+                    "error",
+                    "progress",
+                    "unknown"
+                  ]
+                }
+              },
+              "required": [
+                "rules"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "label": {
+          "description": "Label in the tree instead of the resource name",
+          "type": "string"
+        },
+        "description": {
+          "type": "string",
+          "description": "Template: ${name}, ${namespace}, ${label:<key>}, ${$.<jsonpath>}…"
+        },
+        "hidden": {
+          "default": false,
+          "type": "boolean"
+        },
+        "children": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/__schema0"
+          }
+        }
+      },
+      "required": [
+        "relation"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "title": "K8s View configuration",
+  "allowComments": true
+}

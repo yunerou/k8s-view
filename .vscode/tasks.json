@@ -1,0 +1,26 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "k8s-view: build",
+      "type": "shell",
+      "command": "pnpm --filter k8s-view build",
+      "group": "build",
+      "problemMatcher": "$esbuild"
+    },
+    {
+      "label": "k8s-view: watch",
+      "type": "shell",
+      "command": "pnpm --filter k8s-view watch",
+      "isBackground": true,
+      "problemMatcher": "$esbuild-watch"
+    },
+    {
+      "label": "gitlab-ci-view: build",
+      "type": "shell",
+      "command": "pnpm --filter gitlab-ci-view build",
+      "group": "build",
+      "problemMatcher": "$esbuild"
+    }
+  ]
+}

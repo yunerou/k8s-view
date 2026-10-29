@@ -1,0 +1,11 @@
+node_modules/
+dist/
+out/
+docs/
+.tmp/
+coverage/
+*.vsix
+.vscode-test/
+.superpowers/
+.playwright-mcp/
+out/

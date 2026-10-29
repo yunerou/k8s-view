@@ -1,0 +1,399 @@
+{
+  "name": "gitlab-ci-view",
+  "displayName": "GitLab CI View",
+  "description": "Watch and control GitLab CI pipelines of every repository in the workspace: pipelines, jobs, live logs and DAG.",
+  "publisher": "yunerou",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MIT",
+  "categories": [
+    "Visualization",
+    "Other"
+  ],
+  "keywords": [
+    "gitlab",
+    "gitlab-ci",
+    "ci",
+    "pipeline",
+    "dag"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yunerou/k8s-view"
+  },
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "main": "./dist/extension.js",
+  "type": "commonjs",
+  "extensionDependencies": [
+    "vscode.git"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gitlabCiView",
+          "title": "GitLab CI",
+          "icon": "resources/icons/gitlab-ci.svg"
+        }
+      ]
+    },
+    "views": {
+      "gitlabCiView": [
+        {
+          "id": "gitlabCiView.pipelines",
+          "name": "Pipelines"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "gitlabCiView.pipelines",
+        "contents": "No GitLab repository found in this workspace. Repositories are detected from their git remote: gitlab.com, hosts listed in gitlabCiView.hosts, or hosts that already have a token.\n[Set GitLab token](command:gitlabCiView.setToken)\n[Open settings](command:workbench.action.openSettings?%22gitlabCiView%22)"
+      }
+    ],
+    "commands": [
+      {
+        "command": "gitlabCiView.selectRepository",
+        "title": "Select repository\u2026",
+        "category": "GitLab CI",
+        "icon": "$(repo)"
+      },
+      {
+        "command": "gitlabCiView.filter",
+        "title": "Filter pipelines\u2026",
+        "category": "GitLab CI",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "gitlabCiView.refresh",
+        "title": "Refresh",
+        "category": "GitLab CI",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitlabCiView.openFullView",
+        "title": "Open Full View",
+        "category": "GitLab CI",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "gitlabCiView.runPipeline",
+        "title": "Run pipeline\u2026",
+        "category": "GitLab CI",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "gitlabCiView.setToken",
+        "title": "Set GitLab token\u2026",
+        "category": "GitLab CI",
+        "icon": "$(key)"
+      },
+      {
+        "command": "gitlabCiView.manageTokens",
+        "title": "Manage GitLab tokens\u2026",
+        "category": "GitLab CI",
+        "icon": "$(key)"
+      },
+      {
+        "command": "gitlabCiView.retryPipeline",
+        "title": "Retry pipeline",
+        "category": "GitLab CI",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitlabCiView.cancelPipeline",
+        "title": "Cancel pipeline",
+        "category": "GitLab CI",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "gitlabCiView.playJob",
+        "title": "Run manual job\u2026",
+        "category": "GitLab CI",
+        "icon": "$(play)"
+      },
+      {
+        "command": "gitlabCiView.retryJob",
+        "title": "Retry job",
+        "category": "GitLab CI",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitlabCiView.cancelJob",
+        "title": "Cancel job",
+        "category": "GitLab CI",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "gitlabCiView.openLog",
+        "title": "Open job log",
+        "category": "GitLab CI",
+        "icon": "$(output)"
+      },
+      {
+        "command": "gitlabCiView.openInBrowser",
+        "title": "Open in browser",
+        "category": "GitLab CI",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "gitlabCiView.loadMore",
+        "title": "Load more pipelines",
+        "category": "GitLab CI"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "gitlabCiView.selectRepository",
+          "when": "view == gitlabCiView.pipelines",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitlabCiView.filter",
+          "when": "view == gitlabCiView.pipelines",
+          "group": "navigation@2"
+        },
+        {
+          "command": "gitlabCiView.runPipeline",
+          "when": "view == gitlabCiView.pipelines",
+          "group": "navigation@3"
+        },
+        {
+          "command": "gitlabCiView.refresh",
+          "when": "view == gitlabCiView.pipelines",
+          "group": "navigation@4"
+        },
+        {
+          "command": "gitlabCiView.openFullView",
+          "when": "view == gitlabCiView.pipelines",
+          "group": "navigation@5"
+        },
+        {
+          "command": "gitlabCiView.manageTokens",
+          "when": "view == gitlabCiView.pipelines",
+          "group": "more@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "gitlabCiView.runPipeline",
+          "when": "view == gitlabCiView.pipelines && viewItem == repo",
+          "group": "inline@1"
+        },
+        {
+          "command": "gitlabCiView.retryPipeline",
+          "when": "view == gitlabCiView.pipelines && viewItem =~ /^pipeline.*:retry/",
+          "group": "inline@1"
+        },
+        {
+          "command": "gitlabCiView.cancelPipeline",
+          "when": "view == gitlabCiView.pipelines && viewItem =~ /^pipeline.*:cancel/",
+          "group": "inline@2"
+        },
+        {
+          "command": "gitlabCiView.playJob",
+          "when": "view == gitlabCiView.pipelines && viewItem =~ /^job.*:play/",
+          "group": "inline@1"
+        },
+        {
+          "command": "gitlabCiView.retryJob",
+          "when": "view == gitlabCiView.pipelines && viewItem =~ /^job.*:retry/",
+          "group": "inline@2"
+        },
+        {
+          "command": "gitlabCiView.cancelJob",
+          "when": "view == gitlabCiView.pipelines && viewItem =~ /^job.*:cancel/",
+          "group": "inline@3"
+        },
+        {
+          "command": "gitlabCiView.openLog",
+          "when": "view == gitlabCiView.pipelines && viewItem =~ /^job/",
+          "group": "inline@4"
+        },
+        {
+          "command": "gitlabCiView.openFullView",
+          "when": "view == gitlabCiView.pipelines && viewItem =~ /^pipeline/",
+          "group": "1_open@1"
+        },
+        {
+          "command": "gitlabCiView.openInBrowser",
+          "when": "view == gitlabCiView.pipelines && viewItem =~ /^(pipeline|job)/",
+          "group": "1_open@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "gitlabCiView.retryPipeline",
+          "when": "false"
+        },
+        {
+          "command": "gitlabCiView.cancelPipeline",
+          "when": "false"
+        },
+        {
+          "command": "gitlabCiView.playJob",
+          "when": "false"
+        },
+        {
+          "command": "gitlabCiView.retryJob",
+          "when": "false"
+        },
+        {
+          "command": "gitlabCiView.cancelJob",
+          "when": "false"
+        },
+        {
+          "command": "gitlabCiView.openLog",
+          "when": "false"
+        },
+        {
+          "command": "gitlabCiView.openInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "gitlabCiView.loadMore",
+          "when": "false"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "GitLab CI View",
+      "properties": {
+        "gitlabCiView.hosts": {
+          "type": "array",
+          "scope": "application",
+          "default": [],
+          "markdownDescription": "GitLab instances other than gitlab.com. Read from **User** settings only, so a workspace cannot redirect your tokens.",
+          "items": {
+            "type": "object",
+            "required": [
+              "host"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "host": {
+                "type": "string",
+                "description": "Host name as it appears in the git remote, e.g. git.company.vn"
+              },
+              "apiUrl": {
+                "type": "string",
+                "description": "Base URL of the instance (default https://<host>). May include a relative URL root, e.g. https://git.company.vn/gitlab"
+              },
+              "sshAlias": {
+                "type": "string",
+                "description": "SSH host alias from ~/.ssh/config that points to this host"
+              },
+              "caFile": {
+                "type": "string",
+                "description": "PEM file with extra CA certificates for this host"
+              },
+              "rejectUnauthorized": {
+                "type": "boolean",
+                "default": true,
+                "description": "Set to false to accept any certificate (not recommended)"
+              }
+            }
+          }
+        },
+        "gitlabCiView.refresh.activeSeconds": {
+          "type": "number",
+          "default": 10,
+          "minimum": 3,
+          "description": "Refresh interval while a visible pipeline or job is running."
+        },
+        "gitlabCiView.refresh.idleSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 10,
+          "description": "Refresh interval when nothing visible is running."
+        },
+        "gitlabCiView.notifications": {
+          "type": "string",
+          "enum": [
+            "off",
+            "failed",
+            "all"
+          ],
+          "enumDescriptions": [
+            "No notifications",
+            "Only when a pipeline of the current branch fails",
+            "Whenever a pipeline of the current branch finishes"
+          ],
+          "default": "failed"
+        },
+        "gitlabCiView.tokenExpiryWarningDays": {
+          "type": "number",
+          "default": 7,
+          "minimum": 0,
+          "description": "Warn this many days before a GitLab token expires."
+        },
+        "gitlabCiView.defaultRefFilter": {
+          "type": "string",
+          "enum": [
+            "current",
+            "all"
+          ],
+          "enumDescriptions": [
+            "Only pipelines of the checked-out branch",
+            "Pipelines of every branch"
+          ],
+          "default": "current"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs && vite build -c vite.config.mts",
+    "watch": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc -p src && tsc -p webview-ui && tsc -p test && tsc -p test/integration",
+    "lint": "biome check .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "package": "vsce package --no-dependencies",
+    "test:integration": "vscode-test",
+    "pretest:integration": "node scripts/prepare-it-workspace.mjs && esbuild test/integration/*.test.ts --bundle --platform=node --format=cjs --external:vscode --outdir=out/test/integration --log-level=warning"
+  },
+  "dependencies": {
+    "@needle-di/core": "catalog:",
+    "undici": "catalog:",
+    "vscode-messenger": "catalog:",
+    "vscode-messenger-common": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@tanstack/react-virtual": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/mocha": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@types/vscode": "1.125.0",
+    "@vitejs/plugin-react": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
+    "@vscode-elements/elements": "catalog:",
+    "@vscode-elements/react-elements": "catalog:",
+    "@vscode/codicons": "catalog:",
+    "@vscode/test-cli": "catalog:",
+    "@vscode/test-electron": "catalog:",
+    "@vscode/vsce": "catalog:",
+    "esbuild": "catalog:",
+    "happy-dom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:",
+    "vscode-messenger-webview": "catalog:"
+  }
+}

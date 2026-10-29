@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "K8s View",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/k8s-view"],
+      "outFiles": ["${workspaceFolder}/k8s-view/dist/**/*.js"],
+      "preLaunchTask": "k8s-view: build"
+    },
+    {
+      "name": "GitLab CI View",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/gitlab-ci-view"],
+      "outFiles": ["${workspaceFolder}/gitlab-ci-view/dist/**/*.js"],
+      "preLaunchTask": "gitlab-ci-view: build"
+    }
+  ]
+}

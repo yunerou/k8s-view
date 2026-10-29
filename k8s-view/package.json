@@ -1,0 +1,988 @@
+{
+    "name": "k8s-view",
+    "displayName": "K8s View",
+    "description": "Custom Kubernetes views with auto refresh, resource-bound commands, colored multi-pod logs and parameterized snippets, defined in JSON.",
+    "publisher": "yunerou",
+    "version": "0.0.3",
+    "private": true,
+    "license": "MIT",
+    "icon": "resources/icons/k8s-view.png",
+    "categories": [
+        "Visualization",
+        "Other"
+    ],
+    "keywords": [
+        "kubernetes",
+        "k8s",
+        "fluxcd",
+        "cert-manager",
+        "kubectl"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/yunerou/k8s-view"
+    },
+    "engines": {
+        "vscode": "^1.125.0"
+    },
+    "main": "./dist/extension.js",
+    "type": "commonjs",
+    "l10n": "./l10n",
+    "extensionDependencies": [
+        "ms-kubernetes-tools.vscode-kubernetes-tools"
+    ],
+    "activationEvents": [
+        "onWebviewPanel:k8sView.table"
+    ],
+    "capabilities": {
+        "untrustedWorkspaces": {
+            "supported": "limited",
+            "description": "Commands from the workspace configuration only run when the workspace is trusted; workspace JSONPath filters are disabled.",
+            "restrictedConfigurations": [
+                "k8sView.configFiles",
+                "k8sView.remoteConfigs",
+                "k8sView.extraPath"
+            ]
+        }
+    },
+    "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "k8sView",
+                    "title": "K8s View",
+                    "icon": "resources/icons/k8s-view.svg"
+                }
+            ]
+        },
+        "views": {
+            "k8sView": [
+                {
+                    "id": "k8sView.context",
+                    "name": "Context",
+                    "type": "webview"
+                },
+                {
+                    "id": "k8sView.view",
+                    "name": "View"
+                },
+                {
+                    "id": "k8sView.snippets",
+                    "name": "Snippets"
+                }
+            ]
+        },
+        "viewsWelcome": [
+            {
+                "view": "k8sView.view",
+                "contents": "No Kubernetes context selected.\n[Select context](command:k8sView.selectContext)"
+            },
+            {
+                "view": "k8sView.snippets",
+                "contents": "No snippets yet. A snippet is a command line with parameters (${input:name}) that runs on the selected context or namespace.\n[Create snippet](command:k8sView.createSnippet)"
+            }
+        ],
+        "jsonValidation": [
+            {
+                "fileMatch": [
+                    "**/k8s-view/*.json"
+                ],
+                "url": "./schemas/k8s-view.schema.json"
+            }
+        ],
+        "commands": [
+            {
+                "command": "k8sView.selectContext",
+                "title": "Select context…",
+                "category": "K8s View",
+                "icon": "$(server-environment)"
+            },
+            {
+                "command": "k8sView.selectNamespace",
+                "title": "Select namespace…",
+                "category": "K8s View",
+                "icon": "$(symbol-namespace)"
+            },
+            {
+                "command": "k8sView.reconnect",
+                "title": "Reconnect",
+                "category": "K8s View",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "k8sView.openSettings",
+                "title": "Settings",
+                "category": "K8s View",
+                "icon": "$(gear)"
+            },
+            {
+                "command": "k8sView.reloadRemoteConfigs",
+                "title": "Reload remote configs",
+                "category": "K8s View",
+                "icon": "$(cloud-download)"
+            },
+            {
+                "command": "k8sView.switchView",
+                "title": "Switch view…",
+                "category": "K8s View",
+                "icon": "$(layers)"
+            },
+            {
+                "command": "k8sView.configureFavoriteViews",
+                "title": "Configure favorite views…",
+                "category": "K8s View",
+                "icon": "$(star)"
+            },
+            {
+                "command": "k8sView.selectKind",
+                "title": "Browse resource kind…",
+                "category": "K8s View",
+                "icon": "$(search)"
+            },
+            {
+                "command": "k8sView.listCrdInstances",
+                "title": "List instances",
+                "category": "K8s View",
+                "icon": "$(list-flat)"
+            },
+            {
+                "command": "k8sView.manageViews",
+                "title": "Show/hide views…",
+                "category": "K8s View",
+                "icon": "$(eye)"
+            },
+            {
+                "command": "k8sView.runCommand",
+                "title": "Commands…",
+                "category": "K8s View",
+                "icon": "$(run-all)"
+            },
+            {
+                "command": "k8sView.runLastCommand",
+                "title": "Run last command",
+                "category": "K8s View",
+                "icon": "$(history)"
+            },
+            {
+                "command": "k8sView.runSnippet",
+                "title": "Run snippet…",
+                "category": "K8s View",
+                "icon": "$(terminal)"
+            },
+            {
+                "command": "k8sView.findPods",
+                "title": "Find pods by label / annotation…",
+                "category": "K8s View",
+                "icon": "$(search)"
+            },
+            {
+                "command": "k8sView.createSnippet",
+                "title": "Create snippet…",
+                "category": "K8s View",
+                "icon": "$(add)"
+            },
+            {
+                "command": "k8sView.runSnippetItem",
+                "title": "Run",
+                "category": "K8s View",
+                "icon": "$(play)"
+            },
+            {
+                "command": "k8sView.editSnippet",
+                "title": "Edit snippet",
+                "category": "K8s View",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "k8sView.deleteSnippet",
+                "title": "Delete snippet",
+                "category": "K8s View",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "k8sView.refresh",
+                "title": "Refresh",
+                "category": "K8s View",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "k8sView.pause",
+                "title": "Pause auto refresh",
+                "category": "K8s View",
+                "icon": "$(debug-pause)"
+            },
+            {
+                "command": "k8sView.resume",
+                "title": "Resume auto refresh",
+                "category": "K8s View",
+                "icon": "$(debug-continue)"
+            },
+            {
+                "command": "k8sView.toggleAutoRefresh",
+                "title": "Toggle auto refresh",
+                "category": "K8s View"
+            },
+            {
+                "command": "k8sView.toggleHotkeys",
+                "title": "Toggle hotkeys",
+                "category": "K8s View",
+                "icon": "$(keyboard)"
+            },
+            {
+                "command": "k8sView.openTable",
+                "title": "Open as table",
+                "category": "K8s View",
+                "icon": "$(table)"
+            },
+            {
+                "command": "k8sView.editViewConfig",
+                "title": "Edit view config",
+                "category": "K8s View",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "k8sView.createCustomView",
+                "title": "Create custom view",
+                "category": "K8s View",
+                "icon": "$(new-file)"
+            },
+            {
+                "command": "k8sView.openManifest",
+                "title": "Manifest",
+                "category": "K8s View",
+                "icon": "$(file-code)"
+            },
+            {
+                "command": "k8sView.describe",
+                "title": "Describe",
+                "category": "K8s View",
+                "icon": "$(info)"
+            },
+            {
+                "command": "k8sView.logs",
+                "title": "Logs",
+                "category": "K8s View",
+                "icon": "$(output)"
+            },
+            {
+                "command": "k8sView.containerLogs",
+                "title": "Logs",
+                "category": "K8s View",
+                "icon": "$(output)"
+            },
+            {
+                "command": "k8sView.decodeSecret",
+                "title": "Decrypt secret",
+                "category": "K8s View",
+                "icon": "$(unlock)"
+            },
+            {
+                "command": "k8sView.rolloutRestart",
+                "title": "Rollout restart",
+                "category": "K8s View",
+                "icon": "$(debug-restart)"
+            },
+            {
+                "command": "k8sView.openInBrowser",
+                "title": "Open in browser",
+                "category": "K8s View",
+                "icon": "$(link-external)"
+            },
+            {
+                "command": "k8sView.helmShowValues",
+                "title": "Show values",
+                "category": "K8s View",
+                "icon": "$(symbol-property)"
+            },
+            {
+                "command": "k8sView.helmShowDefaultValues",
+                "title": "Show default values",
+                "category": "K8s View",
+                "icon": "$(symbol-constant)"
+            },
+            {
+                "command": "k8sView.nodeCordon",
+                "title": "Cordon",
+                "category": "K8s View",
+                "icon": "$(debug-pause)"
+            },
+            {
+                "command": "k8sView.nodeUncordon",
+                "title": "Uncordon",
+                "category": "K8s View",
+                "icon": "$(debug-continue)"
+            },
+            {
+                "command": "k8sView.nodeDrain",
+                "title": "Drain…",
+                "category": "K8s View",
+                "icon": "$(arrow-circle-down)"
+            },
+            {
+                "command": "k8sView.copyToClipboard",
+                "title": "Copy to clipboard",
+                "category": "K8s View"
+            },
+            {
+                "command": "k8sView.portForward",
+                "title": "Port-forward",
+                "category": "K8s View"
+            },
+            {
+                "command": "k8sView.portForwards",
+                "title": "Port-forwards…",
+                "category": "K8s View",
+                "icon": "$(plug)"
+            },
+            {
+                "command": "k8sView.portForwardResource",
+                "title": "Port-forward…",
+                "category": "K8s View",
+                "icon": "$(plug)"
+            },
+            {
+                "command": "k8sView.stopPortForward",
+                "title": "Stop port-forward",
+                "category": "K8s View",
+                "icon": "$(debug-stop)"
+            },
+            {
+                "command": "k8sView.openPortForward",
+                "title": "Open in browser",
+                "category": "K8s View",
+                "icon": "$(link-external)"
+            },
+            {
+                "command": "k8sView.portForwardOutput",
+                "title": "Show port-forward output",
+                "category": "K8s View",
+                "icon": "$(output)"
+            },
+            {
+                "command": "k8sView.copyFieldValue",
+                "title": "Copy value",
+                "category": "K8s View",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "k8sView.copySecretValue",
+                "title": "Copy decoded value",
+                "category": "K8s View",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "k8sView.revealSecretValue",
+                "title": "Reveal value",
+                "category": "K8s View",
+                "icon": "$(eye)"
+            }
+        ],
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "k8sView.runCommand",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.openManifest",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.describe",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.copyToClipboard",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.portForward",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.copyFieldValue",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.copySecretValue",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.revealSecretValue",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.runSnippetItem",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.editSnippet",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.deleteSnippet",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.logs",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.containerLogs",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.decodeSecret",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.rolloutRestart",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.openInBrowser",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.helmShowValues",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.helmShowDefaultValues",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.nodeCordon",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.nodeUncordon",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.nodeDrain",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.listCrdInstances",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.portForwardResource",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.stopPortForward",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.openPortForward",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.pause",
+                    "when": "!k8sView.paused"
+                },
+                {
+                    "command": "k8sView.resume",
+                    "when": "k8sView.paused"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "k8sView.selectKind",
+                    "group": "navigation@0",
+                    "when": "view == k8sView.view && k8sView.activeView == kind"
+                },
+                {
+                    "command": "k8sView.switchView",
+                    "group": "navigation@0",
+                    "when": "view == k8sView.view"
+                },
+                {
+                    "command": "k8sView.refresh",
+                    "group": "navigation@1",
+                    "when": "view =~ /^k8sView\\./ && view != k8sView.context"
+                },
+                {
+                    "command": "k8sView.pause",
+                    "group": "navigation@2",
+                    "when": "view =~ /^k8sView\\./ && view != k8sView.context && !k8sView.paused"
+                },
+                {
+                    "command": "k8sView.resume",
+                    "group": "navigation@2",
+                    "when": "view =~ /^k8sView\\./ && view != k8sView.context && k8sView.paused"
+                },
+                {
+                    "command": "k8sView.openTable",
+                    "group": "navigation@3",
+                    "when": "view =~ /^k8sView\\./ && view != k8sView.context"
+                },
+                {
+                    "command": "k8sView.editViewConfig",
+                    "group": "1_config@1",
+                    "when": "view =~ /^k8sView\\./ && view != k8sView.context"
+                },
+                {
+                    "command": "k8sView.createCustomView",
+                    "group": "1_config@2",
+                    "when": "view =~ /^k8sView\\./"
+                },
+                {
+                    "command": "k8sView.manageViews",
+                    "group": "1_config@3",
+                    "when": "view == k8sView.view"
+                },
+                {
+                    "command": "k8sView.selectContext",
+                    "group": "navigation@1",
+                    "when": "view == k8sView.context"
+                },
+                {
+                    "command": "k8sView.reconnect",
+                    "group": "navigation@2",
+                    "when": "view == k8sView.context"
+                },
+                {
+                    "command": "k8sView.openSettings",
+                    "group": "navigation@9",
+                    "when": "view == k8sView.context"
+                },
+                {
+                    "command": "k8sView.createSnippet",
+                    "group": "navigation@1",
+                    "when": "view == k8sView.snippets"
+                },
+                {
+                    "command": "k8sView.runLastCommand",
+                    "group": "navigation@2",
+                    "when": "view == k8sView.snippets"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "k8sView.runCommand",
+                    "group": "inline@1",
+                    "when": "view =~ /^k8sView\\./ && viewItem =~ /^k8sview\\.resource:/"
+                },
+                {
+                    "command": "k8sView.runCommand",
+                    "group": "1_commands@1",
+                    "when": "view =~ /^k8sView\\./ && viewItem =~ /^k8sview\\.resource:/"
+                },
+                {
+                    "command": "k8sView.runLastCommand",
+                    "group": "1_commands@2",
+                    "when": "view =~ /^k8sView\\./ && viewItem =~ /^k8sview\\.resource:/"
+                },
+                {
+                    "command": "k8sView.logs",
+                    "group": "2_inspect@0",
+                    "when": "view =~ /^k8sView\\./ && viewItem =~ /^k8sview\\.resource:(\\/Pod|apps\\/(Deployment|StatefulSet|DaemonSet|ReplicaSet)|batch\\/Job)$/"
+                },
+                {
+                    "command": "k8sView.decodeSecret",
+                    "group": "2_inspect@3",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.resource:/Secret'"
+                },
+                {
+                    "command": "k8sView.rolloutRestart",
+                    "group": "3_workload@1",
+                    "when": "view =~ /^k8sView\\./ && viewItem =~ /^k8sview\\.resource:apps\\/(Deployment|StatefulSet|DaemonSet)$/"
+                },
+                {
+                    "command": "k8sView.openInBrowser",
+                    "group": "inline@2",
+                    "when": "view =~ /^k8sView\\./ && viewItem =~ /^k8sview\\.resource:(gateway\\.networking\\.k8s\\.io\\/HTTPRoute|networking\\.k8s\\.io\\/Ingress)$/"
+                },
+                {
+                    "command": "k8sView.openInBrowser",
+                    "group": "3_network@1",
+                    "when": "view =~ /^k8sView\\./ && viewItem =~ /^k8sview\\.resource:(gateway\\.networking\\.k8s\\.io\\/HTTPRoute|networking\\.k8s\\.io\\/Ingress)$/"
+                },
+                {
+                    "command": "k8sView.portForwardResource",
+                    "group": "3_network@2",
+                    "when": "view =~ /^k8sView\\./ && viewItem =~ /^k8sview\\.resource:\\/(Service|Pod)$/"
+                },
+                {
+                    "command": "k8sView.helmShowValues",
+                    "group": "2_inspect@4",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.resource:helm.toolkit.fluxcd.io/HelmRelease'"
+                },
+                {
+                    "command": "k8sView.helmShowDefaultValues",
+                    "group": "2_inspect@5",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.resource:helm.toolkit.fluxcd.io/HelmRelease'"
+                },
+                {
+                    "command": "k8sView.nodeCordon",
+                    "group": "3_node@1",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.resource:/Node'"
+                },
+                {
+                    "command": "k8sView.nodeUncordon",
+                    "group": "3_node@2",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.resource:/Node'"
+                },
+                {
+                    "command": "k8sView.nodeDrain",
+                    "group": "3_node@3",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.resource:/Node'"
+                },
+                {
+                    "command": "k8sView.listCrdInstances",
+                    "group": "inline@2",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.resource:apiextensions.k8s.io/CustomResourceDefinition'"
+                },
+                {
+                    "command": "k8sView.listCrdInstances",
+                    "group": "2_inspect@0",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.resource:apiextensions.k8s.io/CustomResourceDefinition'"
+                },
+                {
+                    "command": "k8sView.openPortForward",
+                    "group": "inline@1",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.portForward'"
+                },
+                {
+                    "command": "k8sView.stopPortForward",
+                    "group": "inline@2",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.portForward'"
+                },
+                {
+                    "command": "k8sView.openPortForward",
+                    "group": "1_portForward@1",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.portForward'"
+                },
+                {
+                    "command": "k8sView.portForwardOutput",
+                    "group": "1_portForward@2",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.portForward'"
+                },
+                {
+                    "command": "k8sView.stopPortForward",
+                    "group": "2_stop@1",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.portForward'"
+                },
+                {
+                    "command": "k8sView.containerLogs",
+                    "group": "inline",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.field:/Pod:container'"
+                },
+                {
+                    "command": "k8sView.containerLogs",
+                    "group": "1_field@0",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.field:/Pod:container'"
+                },
+                {
+                    "command": "k8sView.describe",
+                    "group": "2_inspect@1",
+                    "when": "view =~ /^k8sView\\./ && viewItem =~ /^k8sview\\.resource:/"
+                },
+                {
+                    "command": "k8sView.openManifest",
+                    "group": "2_inspect@2",
+                    "when": "view =~ /^k8sView\\./ && viewItem =~ /^k8sview\\.resource:/"
+                },
+                {
+                    "command": "k8sView.copyFieldValue",
+                    "group": "inline",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.field:/ConfigMap'"
+                },
+                {
+                    "command": "k8sView.copyFieldValue",
+                    "group": "1_field@1",
+                    "when": "view =~ /^k8sView\\./ && viewItem =~ /^k8sview\\.field:/ && viewItem != 'k8sview.field:/Secret'"
+                },
+                {
+                    "command": "k8sView.revealSecretValue",
+                    "group": "1_field@1",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.field:/Secret'"
+                },
+                {
+                    "command": "k8sView.copySecretValue",
+                    "group": "1_field@2",
+                    "when": "view =~ /^k8sView\\./ && viewItem == 'k8sview.field:/Secret'"
+                },
+                {
+                    "command": "k8sView.runCommand",
+                    "group": "9_k8sview",
+                    "when": "view == extension.vsKubernetesExplorer && viewItem =~ /vsKubernetes\\.resource/"
+                },
+                {
+                    "command": "k8sView.runSnippetItem",
+                    "group": "inline@1",
+                    "when": "view == k8sView.snippets && viewItem =~ /^k8sview\\.snippet:/"
+                },
+                {
+                    "command": "k8sView.editSnippet",
+                    "group": "inline@2",
+                    "when": "view == k8sView.snippets && viewItem =~ /^k8sview\\.snippet:(user|workspace)$/"
+                },
+                {
+                    "command": "k8sView.runSnippetItem",
+                    "group": "1_run@1",
+                    "when": "view == k8sView.snippets && viewItem =~ /^k8sview\\.snippet:/"
+                },
+                {
+                    "command": "k8sView.editSnippet",
+                    "group": "2_edit@1",
+                    "when": "view == k8sView.snippets && viewItem =~ /^k8sview\\.snippet:(user|workspace)$/"
+                },
+                {
+                    "command": "k8sView.deleteSnippet",
+                    "group": "2_edit@2",
+                    "when": "view == k8sView.snippets && viewItem =~ /^k8sview\\.snippet:(user|workspace)$/"
+                }
+            ]
+        },
+        "configuration": {
+            "title": "K8s View",
+            "properties": {
+                "k8sView.context.followKubernetesExtension": {
+                    "type": "boolean",
+                    "default": false,
+                    "scope": "window",
+                    "description": "Follow the context/namespace selected in the Kubernetes extension (Microsoft): when it changes there, K8s View switches too."
+                },
+                "k8sView.context.protected": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "scope": "application",
+                    "markdownDescription": "Regular expressions (matching the whole name) of sensitive contexts: red status bar and every command asks for confirmation. Workspaces cannot change this."
+                },
+                "k8sView.context.connectTimeoutSeconds": {
+                    "type": "number",
+                    "default": 5,
+                    "minimum": 1,
+                    "scope": "window",
+                    "description": "Timeout of the /version connection check (sign-in through an exec auth plugin is not counted)."
+                },
+                "k8sView.configFiles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [
+                        "~/.config/k8s-view/*.json"
+                    ],
+                    "scope": "machine",
+                    "markdownDescription": "User configuration files (globs; `*` and `?` in the file name). Used for every workspace."
+                },
+                "k8sView.remoteConfigs": {
+                    "type": "array",
+                    "default": [],
+                    "scope": "application",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "url"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "url": {
+                                "type": "string",
+                                "pattern": "^https://",
+                                "markdownDescription": "HTTPS URL of a K8s View JSON file, e.g. a raw GitHub gist (`https://gist.githubusercontent.com/<user>/<id>/raw/<revision>/<file>.json`). A gist page URL loads its first file."
+                            },
+                            "allowCommands": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "default": [],
+                                "markdownDescription": "Commands of this file that may run; **empty = every command is blocked**. Pattern: `<command> <first argument> [args…] [**]` — `*` = one argument, `*` inside a token = any text, `**` (last) = any remaining arguments. The command and its first argument must be literal: `kubectl get **` is allowed, `kubectl **` is not (it would also allow `kubectl exec`). VS Code commands: `vscode:<command id>`."
+                            },
+                            "sha256": {
+                                "type": "string",
+                                "pattern": "^[0-9a-fA-F]{64}$",
+                                "description": "Optional SHA-256 (hex) of the file; any other content is rejected."
+                            }
+                        }
+                    },
+                    "markdownDescription": "Config files loaded from the internet (GitHub gist…), after built-in/preset and before your own files. Commands only run when they match `allowCommands`, are approved once and never take `cwd`, `env`, connection flags (`--server`, `--kubeconfig`, `--token`, `--as`…) or a `--context` other than `${context}`. Workspaces cannot change this. Refresh with **K8s View: Reload remote configs**."
+                },
+                "k8sView.presets.enabled": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": [
+                            "fluxcd",
+                            "cert-manager"
+                        ]
+                    },
+                    "default": [],
+                    "scope": "window",
+                    "description": "Presets that are always enabled."
+                },
+                "k8sView.presets.autoEnable": {
+                    "type": "boolean",
+                    "default": true,
+                    "scope": "window",
+                    "description": "Enable presets automatically when the cluster serves their CRDs."
+                },
+                "k8sView.views.hidden": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "scope": "window",
+                    "markdownDescription": "Ids of the views to hide from **Switch view** (hidden views are never watched). Built-in: `workload`, `config`, `volume`, `service`, `serviceaccount`, `gateway-api`, `scaling`, `node`, `event`, `crd`, `kind` (Single resource kind); presets: `fluxcd`, `cert-manager`. Also editable with **K8s View: Show/hide views…**."
+                },
+                "k8sView.views.favorites": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "maxItems": 9,
+                    "default": [],
+                    "scope": "window",
+                    "markdownDescription": "Favorite view ids by slot: the N-th entry is switched to by hotkey `N` (1–9) in the table view while hotkeys are ON; `\"\"` leaves a slot empty. Also editable with **K8s View: Configure favorite views…**."
+                },
+                "k8sView.extraPath": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "scope": "machine",
+                    "description": "Folders added to PATH when running commands and exec auth plugins (aws, gke-gcloud-auth-plugin, kubelogin…)."
+                },
+                "k8sView.refresh.mode": {
+                    "type": "string",
+                    "enum": [
+                        "watch",
+                        "poll",
+                        "manual"
+                    ],
+                    "default": "watch",
+                    "scope": "window",
+                    "description": "How data is kept up to date."
+                },
+                "k8sView.refresh.pollIntervalSeconds": {
+                    "type": "number",
+                    "default": 10,
+                    "minimum": 3,
+                    "scope": "window",
+                    "description": "Polling interval in poll mode or when watch is not allowed. The Context panel offers 3, 5 and 10 seconds."
+                },
+                "k8sView.refresh.debounceMs": {
+                    "type": "number",
+                    "default": 250,
+                    "minimum": 0,
+                    "scope": "window",
+                    "description": "Batch changes for this long before redrawing."
+                },
+                "k8sView.refresh.maxWatches": {
+                    "type": "number",
+                    "default": 20,
+                    "minimum": 1,
+                    "scope": "window",
+                    "description": "Maximum number of concurrent watches; further kinds are polled."
+                },
+                "k8sView.refresh.pauseWhenUnfocused": {
+                    "type": "boolean",
+                    "default": false,
+                    "scope": "window",
+                    "description": "Pause watches while the window is not focused and resync when it regains focus."
+                },
+                "k8sView.commands.dangerous": {
+                    "type": "string",
+                    "enum": [
+                        "restricted",
+                        "confirm",
+                        "allow"
+                    ],
+                    "enumDescriptions": [
+                        "Dangerous commands cannot run",
+                        "Ask with a modal dialog showing the full command line",
+                        "Run immediately"
+                    ],
+                    "default": "restricted",
+                    "scope": "application",
+                    "markdownDescription": "Policy for commands declared with `\"dangerous\": true` (delete, scale, rollout restart, suspend…). Protected contexts always ask."
+                },
+                "k8sView.logs.tailLines": {
+                    "type": "number",
+                    "default": 200,
+                    "minimum": 0,
+                    "scope": "window",
+                    "description": "Number of recent lines shown when logs open (then new lines follow)."
+                },
+                "k8sView.logs.timestamps": {
+                    "type": "boolean",
+                    "default": false,
+                    "scope": "window",
+                    "description": "Prefix every log line with its timestamp."
+                },
+                "k8sView.logs.highlight": {
+                    "type": "boolean",
+                    "default": true,
+                    "scope": "window",
+                    "description": "Color log levels (ERROR, WARN, INFO, DEBUG) in the log terminal. Pod/container prefixes are always colored."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "gen:schema": "esbuild scripts/gen-schema.ts --bundle --platform=node --outfile=.tmp/gen-schema.cjs --log-level=warning && node .tmp/gen-schema.cjs",
+        "build": "pnpm gen:schema && node esbuild.config.mjs && vite build -c vite.config.mts",
+        "watch": "node esbuild.config.mjs --watch",
+        "typecheck": "tsc -p src && tsc -p webview-ui && tsc -p test && tsc -p test/integration",
+        "lint": "biome check .",
+        "test": "vitest run",
+        "test:coverage": "vitest run --coverage",
+        "test:integration": "vscode-test",
+        "l10n": "vscode-l10n-dev export --outDir ./l10n ./src",
+        "package": "vsce package --no-dependencies",
+        "package:pre-release": "vsce package --no-dependencies --pre-release",
+        "pretest:integration": "esbuild test/integration/*.test.ts --bundle --platform=node --format=cjs --external:vscode --outdir=out/test/integration --log-level=warning"
+    },
+    "dependencies": {
+        "@kubernetes/client-node": "catalog:",
+        "@needle-di/core": "catalog:",
+        "jsonc-parser": "catalog:",
+        "jsonpath-plus": "catalog:",
+        "undici": "catalog:",
+        "vscode-kubernetes-tools-api": "catalog:",
+        "vscode-messenger": "catalog:",
+        "vscode-messenger-common": "catalog:",
+        "yaml": "catalog:",
+        "zod": "catalog:"
+    },
+    "devDependencies": {
+        "@tanstack/react-table": "catalog:",
+        "@tanstack/react-virtual": "catalog:",
+        "@testing-library/react": "catalog:",
+        "@types/mocha": "catalog:",
+        "@types/node": "catalog:",
+        "@types/react": "catalog:",
+        "@types/react-dom": "catalog:",
+        "@types/vscode": "1.125.0",
+        "@vitejs/plugin-react": "catalog:",
+        "@vitest/coverage-v8": "catalog:",
+        "@vscode-elements/elements": "catalog:",
+        "@vscode-elements/react-elements": "catalog:",
+        "@vscode/codicons": "catalog:",
+        "@vscode/l10n": "catalog:",
+        "@vscode/l10n-dev": "catalog:",
+        "@vscode/test-cli": "catalog:",
+        "@vscode/test-electron": "catalog:",
+        "@vscode/vsce": "catalog:",
+        "esbuild": "catalog:",
+        "happy-dom": "catalog:",
+        "ovsx": "catalog:",
+        "react": "catalog:",
+        "react-dom": "catalog:",
+        "typescript": "catalog:",
+        "vite": "catalog:",
+        "vitest": "catalog:",
+        "vscode-messenger-webview": "catalog:"
+    }
+}

@@ -1,0 +1,173 @@
+{
+  "$schema": "../../schemas/k8s-view.schema.json",
+  "version": 1,
+  "views": [
+    {
+      "id": "event",
+      "title": "Event",
+      "icon": "bell",
+      "order": 9,
+      "sections": [
+        {
+          "id": "warnings",
+          "title": "Warnings",
+          "icon": "warning",
+          "resources": [{ "kind": "Event" }],
+          "filter": { "path": "$.type", "op": "eq", "value": "Warning" },
+          "status": {
+            "rules": [
+              { "when": { "path": "$.type", "op": "eq", "value": "Warning" }, "level": "warning", "icon": "warning" }
+            ],
+            "default": "ok"
+          },
+          // Label = related object; Event names (pod.17f3…) are not useful.
+          "label": "${$.involvedObject.kind}/${$.involvedObject.name}",
+          "description": "${$.reason}: ${$.message|trunc:120}",
+          "sort": { "by": "last-seen", "order": "desc" },
+          "columns": [
+            { "title": "Reason", "path": "$.reason" },
+            { "title": "Object", "template": "${$.involvedObject.kind}/${$.involvedObject.name}" },
+            { "title": "Message", "path": "$.message", "width": 420 },
+            { "title": "Count", "path": "$.count", "default": "1" },
+            // New events (events.k8s.io) only have eventTime.
+            { "id": "last-seen", "title": "Last seen", "path": "$['lastTimestamp','eventTime']", "render": "age" },
+            { "title": "Source", "template": "${$.source.component}${$.reportingComponent}", "hidden": true }
+          ],
+          "children": [
+            {
+              "id": "object",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.involvedObject",
+                "group": { "path": "$.apiVersion", "default": "" },
+                "kind": { "path": "$.kind", "default": "Pod" },
+                "namespace": "$.namespace"
+              }
+            }
+          ]
+        },
+        {
+          "id": "events",
+          "title": "All events",
+          "icon": "bell",
+          "resources": [{ "kind": "Event" }],
+          "status": {
+            "rules": [
+              { "when": { "path": "$.type", "op": "eq", "value": "Warning" }, "level": "warning", "icon": "warning" },
+              {
+                "when": { "path": "$.type", "op": "eq", "value": "Normal" },
+                "level": "ok",
+                "icon": "info",
+                "color": "descriptionForeground"
+              }
+            ],
+            "default": "unknown"
+          },
+          "label": "${$.involvedObject.kind}/${$.involvedObject.name}",
+          "description": "${$.reason}: ${$.message|trunc:120}",
+          "sort": { "by": "last-seen", "order": "desc" },
+          "columns": [
+            { "title": "Type", "path": "$.type" },
+            { "title": "Reason", "path": "$.reason" },
+            { "title": "Object", "template": "${$.involvedObject.kind}/${$.involvedObject.name}" },
+            { "title": "Message", "path": "$.message", "width": 420 },
+            { "title": "Count", "path": "$.count", "default": "1" },
+            { "id": "last-seen", "title": "Last seen", "path": "$['lastTimestamp','eventTime']", "render": "age" },
+            { "title": "Source", "template": "${$.source.component}${$.reportingComponent}", "hidden": true }
+          ],
+          "children": [
+            {
+              "id": "object",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.involvedObject",
+                "group": { "path": "$.apiVersion", "default": "" },
+                "kind": { "path": "$.kind", "default": "Pod" },
+                "namespace": "$.namespace"
+              }
+            }
+          ]
+        },
+        {
+          "id": "cluster-objects",
+          "title": "Cluster events (nodes, volumes…)",
+          "icon": "server-environment",
+          "resources": [{ "kind": "Event" }],
+          "allNamespaces": true,
+          // Events for cluster-scoped objects (Node, PersistentVolume, Namespace, ClusterIssuer…)
+          "filter": { "path": "$.involvedObject", "op": "regex", "value": "^(?!.*\"namespace\":\"[^\"]).*$" },
+          "status": {
+            "rules": [
+              { "when": { "path": "$.type", "op": "eq", "value": "Warning" }, "level": "warning", "icon": "warning" },
+              {
+                "when": { "path": "$.type", "op": "eq", "value": "Normal" },
+                "level": "ok",
+                "icon": "info",
+                "color": "descriptionForeground"
+              }
+            ],
+            "default": "unknown"
+          },
+          "label": "${$.involvedObject.kind}/${$.involvedObject.name}",
+          "description": "${$.reason}: ${$.message|trunc:120}",
+          "sort": { "by": "last-seen", "order": "desc" },
+          "columns": [
+            { "title": "Type", "path": "$.type" },
+            { "title": "Reason", "path": "$.reason" },
+            { "title": "Object", "template": "${$.involvedObject.kind}/${$.involvedObject.name}" },
+            { "title": "Message", "path": "$.message", "width": 420 },
+            { "title": "Count", "path": "$.count", "default": "1" },
+            { "id": "last-seen", "title": "Last seen", "path": "$['lastTimestamp','eventTime']", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "object",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.involvedObject",
+                "group": { "path": "$.apiVersion", "default": "" },
+                "kind": { "path": "$.kind", "default": "Node" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "cluster-warnings",
+          "title": "Warnings (all namespaces)",
+          "icon": "globe",
+          "resources": [{ "kind": "Event" }],
+          "allNamespaces": true,
+          "filter": { "path": "$.type", "op": "eq", "value": "Warning" },
+          "status": {
+            "rules": [
+              { "when": { "path": "$.type", "op": "eq", "value": "Warning" }, "level": "warning", "icon": "warning" }
+            ],
+            "default": "ok"
+          },
+          "label": "${$.involvedObject.kind}/${$.involvedObject.name}",
+          "description": "${$.reason}: ${$.message|trunc:120}",
+          "sort": { "by": "last-seen", "order": "desc" },
+          "columns": [
+            { "title": "Reason", "path": "$.reason" },
+            { "title": "Object", "template": "${$.involvedObject.kind}/${$.involvedObject.name}" },
+            { "title": "Message", "path": "$.message", "width": 420 },
+            { "title": "Count", "path": "$.count", "default": "1" },
+            { "id": "last-seen", "title": "Last seen", "path": "$['lastTimestamp','eventTime']", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "object",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.involvedObject",
+                "group": { "path": "$.apiVersion", "default": "" },
+                "kind": { "path": "$.kind", "default": "Pod" },
+                "namespace": "$.namespace"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

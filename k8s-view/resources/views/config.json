@@ -1,0 +1,62 @@
+{
+  "$schema": "../../schemas/k8s-view.schema.json",
+  "version": 1,
+  "views": [
+    {
+      "id": "config",
+      "title": "Config",
+      "icon": "settings",
+      "order": 3,
+      "sections": [
+        {
+          "id": "configmaps",
+          "title": "ConfigMaps",
+          "icon": "symbol-file",
+          "resources": [{ "kind": "ConfigMap" }],
+          "description": "${$.data|count} keys",
+          "columns": [
+            { "title": "Keys", "path": "$.data", "render": "count", "default": "0" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "keys",
+              "relation": {
+                "type": "field",
+                "items": "$.data",
+                "label": "${key}",
+                "description": "${$.value|trunc:80}",
+                "icon": "symbol-key"
+              }
+            }
+          ]
+        },
+        {
+          "id": "secrets",
+          "title": "Secrets",
+          "icon": "lock",
+          "resources": [{ "kind": "Secret" }],
+          "description": "${$.type}",
+          "columns": [
+            { "title": "Type", "path": "$.type" },
+            { "title": "Keys", "path": "$.data", "render": "count", "default": "0" },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "keys",
+              // Values are already masked in the store: only sizes remain.
+              "relation": {
+                "type": "field",
+                "items": "$.data",
+                "label": "${key}",
+                "description": "${$.value}",
+                "icon": "key"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

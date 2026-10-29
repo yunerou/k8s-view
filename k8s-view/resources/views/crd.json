@@ -1,0 +1,183 @@
+{
+  "$schema": "../../schemas/k8s-view.schema.json",
+  "version": 1,
+  "views": [
+    {
+      "id": "crd",
+      "title": "CRDs",
+      "icon": "extensions",
+      // After Event, before presets
+      "order": 9.5,
+      "sections": [
+        {
+          "id": "crds",
+          "title": "CustomResourceDefinitions",
+          "icon": "extensions",
+          "resources": [{ "group": "apiextensions.k8s.io", "kind": "CustomResourceDefinition" }],
+          "status": {
+            "rules": [
+              {
+                "when": { "path": "$.metadata.deletionTimestamp", "op": "exists" },
+                "level": "progress",
+                "summary": "Terminating"
+              },
+              {
+                "when": {
+                  "path": "$.status.conditions[?(@.type=='NamesAccepted')].status",
+                  "op": "eq",
+                  "value": "False"
+                },
+                "level": "error",
+                "summary": "NamesNotAccepted"
+              },
+              {
+                "when": {
+                  "path": "$.status.conditions[?(@.type=='Established')].status",
+                  "op": "eq",
+                  "value": "False"
+                },
+                "level": "error",
+                "summary": "NotEstablished"
+              },
+              {
+                "when": {
+                  "path": "$.status.conditions[?(@.type=='NonStructuralSchema')].status",
+                  "op": "eq",
+                  "value": "True"
+                },
+                "level": "warning",
+                "summary": "NonStructuralSchema"
+              },
+              {
+                // Objects are still stored in the old version: storage migration is required before removing that version from the CRD.
+                "when": { "path": "$.status.storedVersions[1]", "op": "exists" },
+                "level": "warning",
+                "summary": "Multiple stored versions"
+              },
+              {
+                "when": { "path": "$.spec.versions[?(@.served==true && @.deprecated==true)].name", "op": "exists" },
+                "level": "warning",
+                "summary": "Deprecated version served"
+              },
+              {
+                "when": { "path": "$.status.conditions[?(@.type=='Established')].status", "op": "eq", "value": "True" },
+                "level": "ok"
+              }
+            ],
+            "default": "progress"
+          },
+          // CRD names (<plural>.<group>) are long: display Kind in the tree, grouped by API group.
+          "label": "${$.spec.names.kind}",
+          "description": "${$.spec.versions[?(@.storage==true)].name} · served ${$.spec.versions[?(@.served==true)].name}",
+          "groupBy": "$.spec.group",
+          "columns": [
+            { "title": "Kind", "path": "$.spec.names.kind" },
+            { "title": "Group", "path": "$.spec.group" },
+            { "title": "Storage version", "path": "$.spec.versions[?(@.storage==true)].name" },
+            { "title": "Served versions", "path": "$.spec.versions[?(@.served==true)].name", "render": "badge" },
+            { "title": "Deprecated", "path": "$.spec.versions[?(@.deprecated==true)].name", "render": "badge" },
+            { "title": "Stored versions", "path": "$.status.storedVersions[*]", "render": "badge" },
+            { "title": "All versions", "path": "$.spec.versions[*].name", "render": "badge", "hidden": true },
+            { "title": "Scope", "path": "$.spec.scope" },
+            { "title": "Conversion", "path": "$.spec.conversion.strategy", "default": "None", "hidden": true },
+            { "title": "Plural", "path": "$.spec.names.plural", "hidden": true },
+            { "title": "Short names", "path": "$.spec.names.shortNames[*]", "render": "badge", "hidden": true },
+            { "title": "Categories", "path": "$.spec.names.categories[*]", "render": "badge", "hidden": true },
+            // Installed version (chart/operator) — each project records it differently.
+            { "title": "App version", "path": "$.metadata.labels['app.kubernetes.io/version']", "hidden": true },
+            {
+              "title": "Bundle version",
+              "path": "$.metadata.annotations['gateway.networking.k8s.io/bundle-version']",
+              "hidden": true
+            },
+            {
+              "title": "controller-gen",
+              "path": "$.metadata.annotations['controller-gen.kubebuilder.io/version']",
+              "hidden": true
+            },
+            { "title": "Helm release", "path": "$.metadata.annotations['meta.helm.sh/release-name']", "hidden": true },
+            { "title": "Managed by", "path": "$.metadata.labels['app.kubernetes.io/managed-by']", "hidden": true },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "versions",
+              "title": "Versions",
+              "relation": {
+                "type": "field",
+                "items": "$.spec.versions[*]",
+                "label": "${$.name}",
+                "description": "served=${$.served} · storage=${$.storage} · deprecated=${$.deprecated|default:false}",
+                "icon": "versions"
+              }
+            },
+            {
+              "id": "conditions",
+              "title": "Conditions",
+              "relation": {
+                "type": "field",
+                "items": "$.status.conditions[*]",
+                "label": "${$.type}",
+                "description": "${$.status} · ${$.reason} ${$.message|trunc:80}",
+                "icon": "pulse"
+              }
+            }
+          ]
+        },
+        {
+          // All groups/versions served by the API server (built-in, CRDs, aggregated APIs such as metrics.k8s.io)
+          "id": "apiservices",
+          "title": "APIServices",
+          "icon": "symbol-interface",
+          "resources": [{ "group": "apiregistration.k8s.io", "kind": "APIService" }],
+          "status": {
+            "rules": [
+              {
+                "when": { "path": "$.status.conditions[?(@.type=='Available')].status", "op": "eq", "value": "False" },
+                "level": "error",
+                "summary": "Unavailable"
+              },
+              {
+                "when": { "path": "$.status.conditions[?(@.type=='Available')].status", "op": "eq", "value": "True" },
+                "level": "ok"
+              }
+            ],
+            "default": "unknown"
+          },
+          "label": "${$.spec.group|default:core}/${$.spec.version}",
+          "description": "${$.spec.service.name|default:Local}",
+          "sort": "$.spec.group",
+          "columns": [
+            { "title": "Group", "path": "$.spec.group", "default": "core" },
+            { "title": "Version", "path": "$.spec.version" },
+            { "title": "Service", "path": "$.spec.service.name", "default": "Local" },
+            { "title": "Service namespace", "path": "$.spec.service.namespace", "hidden": true },
+            {
+              "title": "Available",
+              "path": "$.status.conditions[?(@.type=='Available')].status",
+              "render": "boolean",
+              "default": "No"
+            },
+            { "title": "Reason", "path": "$.status.conditions[?(@.type=='Available')].reason", "hidden": true },
+            { "title": "Message", "path": "$.status.conditions[?(@.type=='Available')].message", "hidden": true },
+            { "title": "Group priority", "path": "$.spec.groupPriorityMinimum", "hidden": true },
+            { "title": "Version priority", "path": "$.spec.versionPriority", "hidden": true },
+            { "title": "Age", "path": "$.metadata.creationTimestamp", "render": "age" }
+          ],
+          "children": [
+            {
+              "id": "service",
+              "relation": {
+                "type": "fieldRef",
+                "items": "$.spec.service",
+                "group": { "default": "" },
+                "kind": { "default": "Service" },
+                "namespace": "$.namespace"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
