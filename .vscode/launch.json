@@ -16,6 +16,14 @@
       "args": ["--extensionDevelopmentPath=${workspaceFolder}/gitlab-ci-view"],
       "outFiles": ["${workspaceFolder}/gitlab-ci-view/dist/**/*.js"],
       "preLaunchTask": "gitlab-ci-view: build"
+    },
+    {
+      "name": "AWS View",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/aws-view"],
+      "outFiles": ["${workspaceFolder}/aws-view/dist/**/*.js"],
+      "preLaunchTask": "aws-view: build"
     }
   ]
 }

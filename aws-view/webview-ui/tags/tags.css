@@ -1,0 +1,47 @@
+.tags {
+  max-width: 760px;
+  padding: 12px 20px;
+}
+
+.tags h1 {
+  font-size: 1.3em;
+  font-weight: 600;
+}
+
+.tags table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tags th {
+  text-align: left;
+  font-weight: 600;
+  padding: 4px 6px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.tags td {
+  padding: 3px 6px;
+  vertical-align: top;
+}
+
+.tags td:first-child,
+.tags td:nth-child(2) {
+  width: 46%;
+}
+
+.tags vscode-textfield {
+  width: 100%;
+}
+
+.field-error {
+  margin-top: 2px;
+  color: var(--vscode-errorForeground);
+  font-size: 0.9em;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}

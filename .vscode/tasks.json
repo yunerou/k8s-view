@@ -21,6 +21,13 @@
       "command": "pnpm --filter gitlab-ci-view build",
       "group": "build",
       "problemMatcher": "$esbuild"
+    },
+    {
+      "label": "aws-view: build",
+      "type": "shell",
+      "command": "pnpm --filter aws-view build",
+      "group": "build",
+      "problemMatcher": "$esbuild"
     }
   ]
 }

@@ -1,10 +1,16 @@
 packages:
   - "k8s-view"
   - "gitlab-ci-view"
+  - "aws-view"
   - "packages/*"
 
 # All packages use "catalog:" instead of version numbers; Renovate updates versions here.
 catalog:
+  "@aws-sdk/client-ec2": 3.1148.0
+  "@aws-sdk/client-ssm": 3.1148.0
+  "@aws-sdk/client-sts": 3.1148.0
+  "@aws-sdk/credential-providers": 3.1148.0
+  aws-sdk-client-mock: 4.1.0
   typescript: 7.0.2
   "@biomejs/biome": 2.6.2
   "@types/node": 24.19.2

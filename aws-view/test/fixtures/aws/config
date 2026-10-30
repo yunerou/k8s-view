@@ -1,0 +1,21 @@
+[default]
+region = eu-west-1
+
+[profile dev-mfa]
+region = eu-west-1
+mfa_serial = arn:aws:iam::111122223333:mfa/dev
+
+[profile admin-role]
+role_arn = arn:aws:iam::111122223333:role/Admin
+source_profile = default
+mfa_serial = arn:aws:iam::111122223333:mfa/dev
+
+[profile corp-sso]
+sso_session = corp
+sso_account_id = 111122223333
+sso_role_name = Developer
+region = ap-southeast-1
+
+[sso-session corp]
+sso_start_url = https://corp.awsapps.com/start
+sso_region = ap-southeast-1

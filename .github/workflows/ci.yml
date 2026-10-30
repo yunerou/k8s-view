@@ -14,12 +14,20 @@ jobs:
     outputs:
       k8s-view: ${{ steps.filter.outputs.k8s-view }}
       gitlab-ci-view: ${{ steps.filter.outputs.gitlab-ci-view }}
+      aws-view: ${{ steps.filter.outputs.aws-view }}
     steps:
       - uses: actions/checkout@v5
       - id: filter
         uses: dorny/paths-filter@v3
         with:
           filters: |
+            aws-view:
+              - 'aws-view/**'
+              - 'pnpm-workspace.yaml'
+              - 'pnpm-lock.yaml'
+              - 'tsconfig.base.json'
+              - 'biome.json'
+              - '.github/workflows/ci.yml'
             gitlab-ci-view:
               - 'gitlab-ci-view/**'
               - 'pnpm-workspace.yaml'
@@ -141,3 +149,39 @@ jobs:
         with:
           name: gitlab-ci-view-vsix
           path: gitlab-ci-view/*.vsix
+
+  aws-view:
+    needs: changes
+    if: needs.changes.outputs.aws-view == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: aws-view
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.14.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+      - name: Lint
+        run: pnpm exec biome ci aws-view
+        working-directory: .
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test:coverage
+      - name: Build
+        run: pnpm build
+      - name: Integration tests
+        run: xvfb-run -a pnpm test:integration
+      - name: Package
+        run: pnpm package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aws-view-vsix
+          path: aws-view/*.vsix
