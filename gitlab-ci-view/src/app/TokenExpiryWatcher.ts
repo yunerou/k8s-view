@@ -37,7 +37,7 @@ export class TokenExpiryWatcher implements Disposable {
     let dirty = false;
     for (const host of this.store.hosts()) {
       const meta = this.store.meta(host);
-      if (!meta || meta.invalid || warned[host] === today) continue;
+      if (!meta || meta.expirySource === "file" || meta.invalid || warned[host] === today) continue;
       const state = expiryState(meta.expiresAt, now, this.settings.tokenExpiryWarningDays());
       if (state.kind !== "expiring" && state.kind !== "expired") continue;
       warned[host] = today;

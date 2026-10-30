@@ -23,6 +23,12 @@ export class TokenFlow {
   async setToken(choices: readonly HostTarget[], preset?: HostTarget): Promise<boolean> {
     const target = preset ?? (await this.pickHost(choices));
     if (!target) return false;
+    if (this.store.filePath(target.host)) {
+      await this.notifier.info(
+        `The token for ${target.host} is read from tokenFile. Update that file, or remove tokenFile from User settings to use a global SecretStorage token.`,
+      );
+      return false;
+    }
     const raw = await this.prompter.input({
       title: `GitLab token for ${target.host}`,
       prompt: "Personal access token with the api scope",
@@ -51,7 +57,9 @@ export class TokenFlow {
           expirySource: "api",
           verifiedAt,
         });
-        void this.notifier.info(`GitLab token saved for ${target.host} (${this.expiryText(result.expiresAt)}).`);
+        void this.notifier.info(
+          `GitLab token saved globally for ${target.host} (${this.expiryText(result.expiresAt)}).`,
+        );
         return true;
       case "manual": {
         const expiresAt = await this.askExpiry(target.host);
@@ -64,7 +72,7 @@ export class TokenFlow {
           verifiedAt,
         });
         void this.notifier.info(
-          `GitLab token saved for ${target.host}. GitLab did not report its scopes: make sure it has the "api" scope.`,
+          `GitLab token saved globally for ${target.host}. GitLab did not report its scopes: make sure it has the "api" scope.`,
         );
         return true;
       }
@@ -82,6 +90,12 @@ export class TokenFlow {
       { title: "GitLab tokens" },
     );
     if (!host) return;
+    if (this.store.filePath(host)) {
+      await this.notifier.info(
+        `Token file for ${host}: ${this.store.filePath(host)}. Edit the file to update the token; remove tokenFile from User settings to use SecretStorage.`,
+      );
+      return;
+    }
     const action = await this.prompter.pick<"update" | "expiry" | "remove">(
       [
         { label: "$(key) Update token…", value: "update" },
@@ -104,6 +118,7 @@ export class TokenFlow {
 
   /** Short host description: token expiration and owner. */
   describe(host: string): string {
+    if (this.store.filePath(host)) return `token file: ${this.store.filePath(host)}`;
     const meta = this.store.meta(host);
     if (!meta) return "no token";
     if (meta.invalid) return "rejected by GitLab, update it";

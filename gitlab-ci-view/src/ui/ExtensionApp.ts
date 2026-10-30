@@ -54,7 +54,17 @@ export class ExtensionApp {
 
   async start(): Promise<void> {
     const subs = this.extension.subscriptions;
-    subs.push(this.log, this.settings, this.repoSource, this.api, this.repos, this.selection, this.poller, this.tree);
+    subs.push(
+      this.tokens,
+      this.log,
+      this.settings,
+      this.repoSource,
+      this.api,
+      this.repos,
+      this.selection,
+      this.poller,
+      this.tree,
+    );
     subs.push(
       this.branches,
       this.statusBar,
@@ -106,6 +116,13 @@ export class ExtensionApp {
   private async onUnauthorized(host: string): Promise<void> {
     if (this.rejectedHosts.has(host)) return;
     this.rejectedHosts.add(host);
+    if (this.tokens.filePath(host)) {
+      this.log.warn(`GitLab rejected tokenFile for ${host} (401).`);
+      await this.notifier.warn(
+        `GitLab rejected tokenFile for ${host}. Update the token in that file, then refresh pipelines.`,
+      );
+      return;
+    }
     await this.tokens.markInvalid(host);
     this.log.warn(`GitLab rejected the token for ${host} (401).`);
     const action = await this.notifier.warn(

@@ -40,6 +40,7 @@ export class VscodeSettings extends Settings implements vscode.Disposable {
       const apiUrl = text("apiUrl");
       const sshAlias = text("sshAlias");
       const caFile = text("caFile");
+      const tokenFile = text("tokenFile");
       const reject = r["rejectUnauthorized"];
       return [
         {
@@ -47,6 +48,7 @@ export class VscodeSettings extends Settings implements vscode.Disposable {
           ...(apiUrl ? { apiUrl } : {}),
           ...(sshAlias ? { sshAlias } : {}),
           ...(caFile ? { caFile } : {}),
+          ...(tokenFile ? { tokenFile } : {}),
           ...(typeof reject === "boolean" ? { rejectUnauthorized: reject } : {}),
         },
       ];

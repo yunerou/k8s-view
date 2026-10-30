@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { GitLabError } from "../../../src/app/ports/GitLabApi";
 import { TokenFlow } from "../../../src/app/TokenFlow";
 import { TokenService } from "../../../src/app/TokenService";
@@ -40,6 +40,14 @@ describe("TokenService.verify", () => {
 });
 
 describe("TokenFlow.setToken", () => {
+  test("directs file-token users to the configured file rather than saving an unused global token", async () => {
+    vi.spyOn(store, "filePath").mockReturnValue("/tokens/gitlab");
+    expect(await flow.setToken([], gitlab)).toBe(false);
+    expect(prompter.shown).toEqual([]);
+    expect(api.calls).toEqual([]);
+    expect(notifier.messages[0]?.message).toContain("tokenFile");
+  });
+
   test("reads expiry and scopes from GitLab", async () => {
     api.route("GET /personal_access_tokens/self", { scopes: ["api", "read_user"], expires_at: "2026-12-01" });
     prompter.answers.push(gitlab, " glpat-abc ");

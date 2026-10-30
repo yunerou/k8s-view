@@ -1,16 +1,17 @@
 import { inject, injectable } from "@needle-di/core";
-import { Emitter } from "../core/util/Emitter";
+import { type Disposable, Emitter } from "../core/util/Emitter";
 import { SecretStore } from "./ports/SecretStore";
 import { StateStore } from "./ports/StateStore";
+import type { TokenFiles } from "./ports/TokenFiles";
 
 export interface TokenMeta {
-  /** `YYYY-MM-DD` date; `null` = never expires. */
+  /** `YYYY-MM-DD` date; `null` = never expires, or unknown for a file token. */
   readonly expiresAt: string | null;
   readonly scopes: readonly string[];
   /** Token owner's username (for the "Only mine" filter). */
   readonly username?: string;
-  /** `api` = read from GitLab, `manual` = entered by the user. */
-  readonly expirySource: "api" | "manual";
+  /** `api` = read from GitLab, `manual` = entered by the user, `file` = unknown metadata. */
+  readonly expirySource: "api" | "manual" | "file";
   readonly verifiedAt: string;
   /** GitLab returned 401: stop calling this host until the token is updated. */
   readonly invalid?: boolean;
@@ -21,7 +22,8 @@ const secretKey = (host: string) => `gitlabCiView.token/${host}`;
 
 /** Tokens by host: values in SecretStorage, metadata in globalState. */
 @injectable()
-export class TokenStore {
+export class TokenStore implements Disposable {
+  private readonly fileSubscription: Disposable | undefined;
   private readonly changed = new Emitter<string>();
   /** Emits the host whose token/metadata just changed. */
   readonly onDidChange = this.changed.event;
@@ -29,18 +31,39 @@ export class TokenStore {
   constructor(
     private readonly secrets = inject(SecretStore),
     private readonly state = inject(StateStore),
-  ) {}
+    private readonly files?: TokenFiles,
+  ) {
+    let previous = files?.hosts() ?? [];
+    this.fileSubscription = files?.onDidChange(() => {
+      const next = files.hosts();
+      const affected = new Set([...previous, ...next]);
+      previous = next;
+      for (const host of affected) this.changed.fire(host);
+    });
+  }
+
+  dispose(): void {
+    this.fileSubscription?.dispose();
+    this.changed.dispose();
+  }
+
+  filePath(host: string): string | undefined {
+    return this.files?.path(host);
+  }
 
   hosts(): string[] {
-    return Object.keys(this.all()).sort();
+    return [...new Set([...Object.keys(this.all()), ...(this.files?.hosts() ?? [])])].sort();
   }
 
   meta(host: string): TokenMeta | undefined {
+    if (this.filePath(host)) {
+      return { expiresAt: null, scopes: [], expirySource: "file", verifiedAt: "" };
+    }
     return this.all()[host];
   }
 
   token(host: string): Promise<string | undefined> {
-    return this.secrets.get(secretKey(host));
+    return this.files && this.filePath(host) ? this.files.read(host) : this.secrets.get(secretKey(host));
   }
 
   async save(host: string, token: string, meta: TokenMeta): Promise<void> {
@@ -50,6 +73,7 @@ export class TokenStore {
   }
 
   async updateMeta(host: string, patch: Partial<TokenMeta>): Promise<void> {
+    if (this.filePath(host)) return;
     const current = this.meta(host);
     if (!current) return;
     await this.state.setGlobal(META_KEY, { ...this.all(), [host]: { ...current, ...patch } });
@@ -57,7 +81,7 @@ export class TokenStore {
   }
 
   async markInvalid(host: string): Promise<void> {
-    if (this.meta(host)?.invalid) return;
+    if (this.filePath(host) || this.meta(host)?.invalid) return;
     await this.updateMeta(host, { invalid: true });
   }
 

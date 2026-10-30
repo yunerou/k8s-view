@@ -14,6 +14,7 @@ export interface HostSetting {
   readonly apiUrl?: string;
   readonly sshAlias?: string;
   readonly caFile?: string;
+  readonly tokenFile?: string;
   readonly rejectUnauthorized?: boolean;
 }
 

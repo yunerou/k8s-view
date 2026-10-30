@@ -14,6 +14,7 @@ import { TokenStore } from "./app/TokenStore";
 import { EXTENSION_CONTEXT, LOGGER } from "./di/tokens";
 import { VscodeRepoSource } from "./infra/git/VscodeRepoSource";
 import { GitLabHttp } from "./infra/gitlab/GitLabHttp";
+import { FileTokenSource } from "./infra/state/FileTokenSource";
 import { VscodeSecretStore } from "./infra/state/VscodeSecretStore";
 import { VscodeSettings } from "./infra/state/VscodeSettings";
 import { VscodeStateStore } from "./infra/state/VscodeStateStore";
@@ -39,6 +40,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
     .bind({ provide: Settings, useExisting: VscodeSettings })
     .bind({ provide: StateStore, useExisting: VscodeStateStore })
     .bind({ provide: SecretStore, useExisting: VscodeSecretStore })
+    .bind({
+      provide: TokenStore,
+      useFactory: (c) => new TokenStore(c.get(SecretStore), c.get(StateStore), c.get(FileTokenSource)),
+    })
     .bind({ provide: GitLabApi, useExisting: GitLabHttp })
     .bind({ provide: RepoSource, useExisting: VscodeRepoSource })
     .bind({ provide: Prompter, useExisting: VscodePrompter })

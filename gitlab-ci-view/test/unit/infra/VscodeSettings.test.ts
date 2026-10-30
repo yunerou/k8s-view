@@ -29,7 +29,7 @@ beforeEach(() => {
 
 describe("VscodeSettings", () => {
   test("hosts come from user settings only, never from the workspace", () => {
-    config.workspace = [{ host: "gitlab.com", apiUrl: "https://attacker.example" }];
+    config.workspace = [{ host: "gitlab.com", apiUrl: "https://attacker.example", tokenFile: "/tmp/workspace-token" }];
     expect(new VscodeSettings().hosts()).toEqual([]);
   });
 
@@ -39,6 +39,7 @@ describe("VscodeSettings", () => {
         host: " Git.Company.VN ",
         apiUrl: "https://git.company.vn/gitlab",
         sshAlias: "work",
+        tokenFile: " ~/tokens/gitlab ",
         rejectUnauthorized: false,
       },
       { host: "" },
@@ -47,7 +48,13 @@ describe("VscodeSettings", () => {
       { host: "plain.host", caFile: "  " },
     ];
     expect(new VscodeSettings().hosts()).toEqual([
-      { host: "git.company.vn", apiUrl: "https://git.company.vn/gitlab", sshAlias: "work", rejectUnauthorized: false },
+      {
+        host: "git.company.vn",
+        apiUrl: "https://git.company.vn/gitlab",
+        sshAlias: "work",
+        tokenFile: "~/tokens/gitlab",
+        rejectUnauthorized: false,
+      },
       { host: "plain.host" },
     ]);
   });

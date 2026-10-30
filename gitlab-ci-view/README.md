@@ -11,15 +11,54 @@ Monitor and control GitLab CI for every GitLab repository in your VS Code worksp
 - **Job logs**: ANSI colors, collapsible sections, automatic scrolling as new logs arrive, and search.
 - **Auto-refresh**: every 10 seconds while pipelines are running, every 60 seconds when idle, and paused when the VS Code window loses focus.
 - **Status bar** for the latest pipeline on the checked-out branch, with **notifications** when that pipeline finishes.
-- **Tokens per host**, stored in VS Code SecretStorage. Expiration dates are read from GitLab or entered manually, with a "Never expires" option. Warnings appear before expiration.
+- **Global tokens per host**, stored in VS Code SecretStorage and shared across workspaces in the same VS Code environment, or read from a configured token file. Expiration dates are read from GitLab or entered manually, with a "Never expires" option. Warnings appear before expiration.
 
 ## Getting started
 
 1. Create a Personal Access Token with the **`api`** scope (GitLab → Preferences → Access tokens).
-2. Run **GitLab CI: Set GitLab token…**, select a host, and paste your token. The extension validates the token and reads its expiration date and scopes.
+2. Run **GitLab CI: Set GitLab token…**, select a host, and paste your token. Tokens are saved globally for that host, rather than per workspace. The extension validates the token and reads its expiration date and scopes.
 3. Open the **GitLab CI** view in the activity bar.
 
 Repositories are detected from their Git remotes (`origin` takes priority). gitlab.com is recognized automatically. For self-hosted instances, simply set a token for the host or declare the host in the settings.
+
+## Use a token file across workspaces
+
+1. Create a GitLab Personal Access Token with the **`api`** scope.
+2. Create a plain-text file outside your repository, for example `~/.config/gitlab/token`. Paste only the raw token into it and save:
+
+   ```text
+   glpat-your-token-here
+   ```
+
+   Do not use JSON, quotes, or a `TOKEN=` prefix. On macOS/Linux, restrict access with `chmod 600 ~/.config/gitlab/token`.
+3. Open the Command Palette (`Cmd+Shift+P` on macOS, `Ctrl+Shift+P` on Windows/Linux) and run **Preferences: Open User Settings (JSON)**. You can also open **Settings → User**, search for `gitlabCiView.hosts`, and click **Edit in settings.json**. The setting itself includes setup instructions and an example.
+4. Add `gitlabCiView.hosts` inside the existing settings object. Replace the example hosts and paths with yours; if `gitlabCiView.hosts` already exists, edit its array instead of adding a duplicate key:
+
+   ```json
+   {
+     "gitlabCiView.hosts": [
+       {
+         "host": "gitlab.com",
+         "tokenFile": "~/.config/gitlab/token"
+       },
+       {
+         "host": "git.company.vn",
+         "tokenFile": "/absolute/path/to/company-token"
+       }
+     ]
+   }
+   ```
+
+   Keep only the entries you need. `host` must be the GitLab host name without `https://` or a project path. Include `gitlab.com` explicitly when using a token file for it. For an SSH alias, use the real host in `host` and the alias in `sshAlias`.
+5. Open the **GitLab CI** view and run **GitLab CI: Refresh**. When rotating the token, replace the file contents and refresh again.
+
+Each file contains only its host's raw token (for example, `glpat-…`), with optional surrounding whitespace. Use an absolute path or `~/…`. The file is read on the machine running the extension; for Remote SSH, WSL, or Dev Containers, the file must exist in that environment. Workspace settings cannot override host or token-file settings.
+
+`tokenFile` takes precedence over the global SecretStorage token. The extension reads the file for every API request, so replacing its contents takes effect on the next refresh, including after a 401. Missing, unreadable, empty, or multiline files report an error without falling back to a different token. Remove `tokenFile` to use **Set GitLab token…** and SecretStorage again.
+
+File tokens do not supply expiry or username metadata, so expiry warnings and the **Only mine** filter require a token saved through **Set GitLab token…**.
+
+If a token saved in another workspace is unavailable, check that both workspaces use the same VS Code profile/environment and the same host (configure `sshAlias` for SSH aliases). A file can provide a shared source when SecretStorage is unavailable in the current environment.
 
 ## Find pipelines by event or tag
 
@@ -35,7 +74,7 @@ Filters are sent to the GitLab API and shared between the tree and full views. A
 
 | Setting | Default | Description |
 |---|---|---|
-| `gitlabCiView.hosts` | `[]` | Instances other than gitlab.com: `host`, `apiUrl` (may include a relative URL root), `sshAlias`, `caFile`, `rejectUnauthorized`. **Read from User settings only.** |
+| `gitlabCiView.hosts` | `[]` | GitLab instances, including gitlab.com when using `tokenFile`: `host`, `apiUrl` (may include a relative URL root), `sshAlias`, `caFile`, `tokenFile`, `rejectUnauthorized`. **Read from User settings only.** See [token file setup](#use-a-token-file-across-workspaces). |
 | `gitlabCiView.refresh.activeSeconds` | `10` | Refresh interval while pipelines/jobs are running (minimum 3 seconds). |
 | `gitlabCiView.refresh.idleSeconds` | `60` | Refresh interval when idle (minimum 10 seconds). |
 | `gitlabCiView.notifications` | `failed` | `off`, `failed`, `all`: notifications for pipelines on the current branch. |

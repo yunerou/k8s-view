@@ -1,3 +1,4 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import {
   createServer,
   type IncomingHttpHeaders,
@@ -6,11 +7,14 @@ import {
   type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import { z } from "zod";
 import { GitLabError } from "../../../src/app/ports/GitLabApi";
 import { type TokenMeta, TokenStore } from "../../../src/app/TokenStore";
 import { GitLabHttp, networkError } from "../../../src/infra/gitlab/GitLabHttp";
+import { FileTokenSource } from "../../../src/infra/state/FileTokenSource";
 import { FakeSecrets, FakeSettings, FakeState } from "../helpers/fakes";
 
 type Handler = (req: IncomingMessage, res: ServerResponse, body: string) => void;
@@ -103,6 +107,32 @@ describe("GitLabHttp.get", () => {
     await store.markInvalid("local");
     await expect(http.get(target(), "/user", {}, names)).rejects.toMatchObject({ kind: "unauthorized" });
     expect(seen).toHaveLength(0);
+  });
+
+  test("uses a configured file without metadata and recovers after a rejected file token is rotated", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "gitlab-http-token-"));
+    const path = join(directory, "token");
+    const settings = new FakeSettings();
+    settings.values.hosts = [{ host: "local", tokenFile: path }];
+    const fileStore = new TokenStore(new FakeSecrets(), new FakeState(), new FileTokenSource(settings));
+    const client = new GitLabHttp(fileStore, settings);
+    client.onUnauthorized((host) => void fileStore.markInvalid(host));
+    try {
+      await writeFile(path, "rejected-token\n");
+      handler = (_req, res) => json(res, 401, { message: "401 Unauthorized" });
+      await expect(client.get(target(), "/user", {}, names)).rejects.toMatchObject({ kind: "unauthorized" });
+      expect(seen[0]?.headers["private-token"]).toBe("rejected-token");
+      await writeFile(path, "rotated-token\n");
+      handler = (_req, res) => json(res, 200, [{ name: "me" }]);
+      expect((await client.get(target(), "/user", {}, names)).data).toEqual([{ name: "me" }]);
+      expect(seen[1]?.headers["private-token"]).toBe("rotated-token");
+      await client.get(target(), "/user", {}, names, { token: "explicit-token" });
+      expect(seen[2]?.headers["private-token"]).toBe("explicit-token");
+    } finally {
+      client.dispose();
+      fileStore.dispose();
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   test("no token for the host", async () => {

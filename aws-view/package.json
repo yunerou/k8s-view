@@ -1,444 +1,445 @@
 {
-  "name": "aws-view",
-  "displayName": "AWS View",
-  "description": "Start and stop your EC2 dev machines and open them in VS Code Remote over AWS Session Manager.",
-  "publisher": "yunerou",
-  "version": "0.0.1",
-  "private": true,
-  "license": "MIT",
-  "categories": [
-    "Other"
-  ],
-  "keywords": [
-    "aws",
-    "ec2",
-    "ssm",
-    "session manager",
-    "remote-ssh"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/yunerou/k8s-view"
-  },
-  "engines": {
-    "vscode": "^1.125.0"
-  },
-  "main": "./dist/extension.js",
-  "type": "commonjs",
-  "extensionKind": [
-    "ui"
-  ],
-  "activationEvents": [
-    "onStartupFinished"
-  ],
-  "capabilities": {
-    "untrustedWorkspaces": {
-      "supported": "limited",
-      "description": "The AWS CLI path and the SSH config path are read from user settings only.",
-      "restrictedConfigurations": [
-        "awsView.awsCliPath",
-        "awsView.sshConfigPath"
-      ]
-    }
-  },
-  "contributes": {
-    "viewsContainers": {
-      "activitybar": [
-        {
-          "id": "awsView",
-          "title": "AWS View",
-          "icon": "resources/icons/aws-view.svg"
-        }
-      ]
-    },
-    "views": {
-      "awsView": [
-        {
-          "id": "awsView.instances",
-          "name": "Instances"
-        }
-      ]
-    },
-    "commands": [
-      {
-        "command": "awsView.selectProfile",
-        "title": "Select AWS profile\u2026",
-        "category": "AWS View",
-        "icon": "$(account)"
-      },
-      {
-        "command": "awsView.signIn",
-        "title": "Sign in",
-        "category": "AWS View",
-        "icon": "$(key)"
-      },
-      {
-        "command": "awsView.signOut",
-        "title": "Sign out",
-        "category": "AWS View",
-        "icon": "$(sign-out)"
-      },
-      {
-        "command": "awsView.selectRegion",
-        "title": "Select region\u2026",
-        "category": "AWS View",
-        "icon": "$(globe)"
-      },
-      {
-        "command": "awsView.refresh",
-        "title": "Refresh",
-        "category": "AWS View",
-        "icon": "$(refresh)"
-      },
-      {
-        "command": "awsView.filter",
-        "title": "Filter instances\u2026",
-        "category": "AWS View",
-        "icon": "$(filter)"
-      },
-      {
-        "command": "awsView.togglePinnedOnly",
-        "title": "Show pinned instances only (toggle)",
-        "category": "AWS View",
-        "icon": "$(pinned)"
-      },
-      {
-        "command": "awsView.clearFilter",
-        "title": "Clear filter",
-        "category": "AWS View",
-        "icon": "$(clear-all)"
-      },
-      {
-        "command": "awsView.start",
-        "title": "Start",
-        "category": "AWS View",
-        "icon": "$(debug-start)"
-      },
-      {
-        "command": "awsView.stop",
-        "title": "Stop",
-        "category": "AWS View",
-        "icon": "$(debug-stop)"
-      },
-      {
-        "command": "awsView.openRemote",
-        "title": "Open in Remote",
-        "category": "AWS View",
-        "icon": "$(remote-explorer)"
-      },
-      {
-        "command": "awsView.openTerminal",
-        "title": "Open SSM terminal (ssm-user)",
-        "category": "AWS View",
-        "icon": "$(terminal)"
-      },
-      {
-        "command": "awsView.editTags",
-        "title": "Edit tags\u2026",
-        "category": "AWS View",
-        "icon": "$(tag)"
-      },
-      {
-        "command": "awsView.rename",
-        "title": "Rename\u2026",
-        "category": "AWS View",
-        "icon": "$(edit)"
-      },
-      {
-        "command": "awsView.pin",
-        "title": "Pin",
-        "category": "AWS View",
-        "icon": "$(pin)"
-      },
-      {
-        "command": "awsView.unpin",
-        "title": "Unpin",
-        "category": "AWS View",
-        "icon": "$(pinned)"
-      },
-      {
-        "command": "awsView.setSshUser",
-        "title": "Set SSH user\u2026",
-        "category": "AWS View"
-      },
-      {
-        "command": "awsView.setFallbackKey",
-        "title": "Set fallback SSH key\u2026",
-        "category": "AWS View"
-      },
-      {
-        "command": "awsView.copyInstanceId",
-        "title": "Copy instance ID",
-        "category": "AWS View"
-      },
-      {
-        "command": "awsView.runDoctor",
-        "title": "Run Doctor",
-        "category": "AWS View",
-        "icon": "$(checklist)"
-      },
-      {
-        "command": "awsView.remoteActions",
-        "title": "Instance of this window\u2026",
-        "category": "AWS View"
-      }
+    "name": "aws-view",
+    "displayName": "AWS View",
+    "description": "Start and stop your EC2 dev machines and open them in VS Code Remote over AWS Session Manager.",
+    "publisher": "yunerou",
+    "version": "0.0.1",
+    "private": true,
+    "license": "MIT",
+    "icon": "resources/icons/aws-view.png",
+    "categories": [
+        "Other"
     ],
-    "menus": {
-      "view/title": [
-        {
-          "command": "awsView.selectProfile",
-          "when": "view == awsView.instances",
-          "group": "navigation@1"
-        },
-        {
-          "command": "awsView.selectRegion",
-          "when": "view == awsView.instances",
-          "group": "navigation@2"
-        },
-        {
-          "command": "awsView.filter",
-          "when": "view == awsView.instances",
-          "group": "navigation@3"
-        },
-        {
-          "command": "awsView.refresh",
-          "when": "view == awsView.instances",
-          "group": "navigation@4"
-        },
-        {
-          "command": "awsView.togglePinnedOnly",
-          "when": "view == awsView.instances",
-          "group": "more@1"
-        },
-        {
-          "command": "awsView.clearFilter",
-          "when": "view == awsView.instances",
-          "group": "more@2"
-        },
-        {
-          "command": "awsView.signOut",
-          "when": "view == awsView.instances",
-          "group": "more@3"
-        },
-        {
-          "command": "awsView.runDoctor",
-          "when": "view == awsView.instances",
-          "group": "more@4"
-        }
-      ],
-      "view/item/context": [
-        {
-          "command": "awsView.start",
-          "when": "view == awsView.instances && viewItem =~ /^instance.*:start/",
-          "group": "inline@1"
-        },
-        {
-          "command": "awsView.openRemote",
-          "when": "view == awsView.instances && viewItem =~ /^instance.*:remote/",
-          "group": "inline@2"
-        },
-        {
-          "command": "awsView.openTerminal",
-          "when": "view == awsView.instances && viewItem =~ /^instance.*:terminal/",
-          "group": "inline@3"
-        },
-        {
-          "command": "awsView.stop",
-          "when": "view == awsView.instances && viewItem =~ /^instance.*:stop/",
-          "group": "inline@4"
-        },
-        {
-          "command": "awsView.editTags",
-          "when": "view == awsView.instances && viewItem =~ /^instance/",
-          "group": "1_edit@1"
-        },
-        {
-          "command": "awsView.rename",
-          "when": "view == awsView.instances && viewItem =~ /^instance/",
-          "group": "1_edit@2"
-        },
-        {
-          "command": "awsView.pin",
-          "when": "view == awsView.instances && viewItem =~ /^instance.*:unpinned/",
-          "group": "2_pin@1"
-        },
-        {
-          "command": "awsView.unpin",
-          "when": "view == awsView.instances && viewItem =~ /^instance.*:pinned(:|$)/",
-          "group": "2_pin@1"
-        },
-        {
-          "command": "awsView.setSshUser",
-          "when": "view == awsView.instances && viewItem =~ /^instance/",
-          "group": "3_ssh@1"
-        },
-        {
-          "command": "awsView.setFallbackKey",
-          "when": "view == awsView.instances && viewItem =~ /^instance/",
-          "group": "3_ssh@2"
-        },
-        {
-          "command": "awsView.copyInstanceId",
-          "when": "view == awsView.instances && viewItem =~ /^instance/",
-          "group": "4_copy@1"
-        }
-      ],
-      "commandPalette": [
-        {
-          "command": "awsView.start",
-          "when": "false"
-        },
-        {
-          "command": "awsView.stop",
-          "when": "false"
-        },
-        {
-          "command": "awsView.openRemote",
-          "when": "false"
-        },
-        {
-          "command": "awsView.openTerminal",
-          "when": "false"
-        },
-        {
-          "command": "awsView.editTags",
-          "when": "false"
-        },
-        {
-          "command": "awsView.rename",
-          "when": "false"
-        },
-        {
-          "command": "awsView.pin",
-          "when": "false"
-        },
-        {
-          "command": "awsView.unpin",
-          "when": "false"
-        },
-        {
-          "command": "awsView.setSshUser",
-          "when": "false"
-        },
-        {
-          "command": "awsView.setFallbackKey",
-          "when": "false"
-        },
-        {
-          "command": "awsView.copyInstanceId",
-          "when": "false"
-        }
-      ]
+    "keywords": [
+        "aws",
+        "ec2",
+        "ssm",
+        "session manager",
+        "remote-ssh"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/yunerou/k8s-view"
     },
-    "configuration": {
-      "title": "AWS View",
-      "properties": {
-        "awsView.regions": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "default": [],
-          "markdownDescription": "Regions offered by **Select region**. Empty: the region of the selected profile."
-        },
-        "awsView.defaultTagFilters": {
-          "type": "array",
-          "default": [],
-          "markdownDescription": "Tag filters applied until you change the filter, e.g. `[{ \"key\": \"Owner\", \"values\": [\"alice\"] }]`. An empty `values` list matches every instance that has the tag.",
-          "items": {
-            "type": "object",
-            "required": [
-              "key"
-            ],
-            "additionalProperties": false,
-            "properties": {
-              "key": {
-                "type": "string"
-              },
-              "values": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                },
-                "default": []
-              }
-            }
-          }
-        },
-        "awsView.idleReminder.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Remind you to stop instances that keep running."
-        },
-        "awsView.idleReminder.hours": {
-          "type": "number",
-          "default": 4,
-          "minimum": 0.01,
-          "description": "Remind after an instance has been running this many hours."
-        },
-        "awsView.confirmStop": {
-          "type": "boolean",
-          "default": true,
-          "description": "Ask for confirmation before stopping an instance."
-        },
-        "awsView.awsCliPath": {
-          "type": "string",
-          "scope": "machine",
-          "default": "aws",
-          "markdownDescription": "Path of the AWS CLI v2 executable. Read from **User** settings only."
-        },
-        "awsView.sshConfigPath": {
-          "type": "string",
-          "scope": "machine",
-          "default": "~/.ssh/aws-view.config",
-          "markdownDescription": "File where AWS View writes its SSH hosts (included from `~/.ssh/config`). Read from **User** settings only."
+    "engines": {
+        "vscode": "^1.125.0"
+    },
+    "main": "./dist/extension.js",
+    "type": "commonjs",
+    "extensionKind": [
+        "ui"
+    ],
+    "activationEvents": [
+        "onStartupFinished"
+    ],
+    "capabilities": {
+        "untrustedWorkspaces": {
+            "supported": "limited",
+            "description": "The AWS CLI path and the SSH config path are read from user settings only.",
+            "restrictedConfigurations": [
+                "awsView.awsCliPath",
+                "awsView.sshConfigPath"
+            ]
         }
-      }
+    },
+    "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "awsView",
+                    "title": "AWS View",
+                    "icon": "resources/icons/aws-view.svg"
+                }
+            ]
+        },
+        "views": {
+            "awsView": [
+                {
+                    "id": "awsView.instances",
+                    "name": "Instances"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "awsView.selectProfile",
+                "title": "Select AWS profile\u2026",
+                "category": "AWS View",
+                "icon": "$(account)"
+            },
+            {
+                "command": "awsView.signIn",
+                "title": "Sign in",
+                "category": "AWS View",
+                "icon": "$(key)"
+            },
+            {
+                "command": "awsView.signOut",
+                "title": "Sign out",
+                "category": "AWS View",
+                "icon": "$(sign-out)"
+            },
+            {
+                "command": "awsView.selectRegion",
+                "title": "Select region\u2026",
+                "category": "AWS View",
+                "icon": "$(globe)"
+            },
+            {
+                "command": "awsView.refresh",
+                "title": "Refresh",
+                "category": "AWS View",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "awsView.filter",
+                "title": "Filter instances\u2026",
+                "category": "AWS View",
+                "icon": "$(filter)"
+            },
+            {
+                "command": "awsView.togglePinnedOnly",
+                "title": "Show pinned instances only (toggle)",
+                "category": "AWS View",
+                "icon": "$(pinned)"
+            },
+            {
+                "command": "awsView.clearFilter",
+                "title": "Clear filter",
+                "category": "AWS View",
+                "icon": "$(clear-all)"
+            },
+            {
+                "command": "awsView.start",
+                "title": "Start",
+                "category": "AWS View",
+                "icon": "$(debug-start)"
+            },
+            {
+                "command": "awsView.stop",
+                "title": "Stop",
+                "category": "AWS View",
+                "icon": "$(debug-stop)"
+            },
+            {
+                "command": "awsView.openRemote",
+                "title": "Open in Remote",
+                "category": "AWS View",
+                "icon": "$(remote-explorer)"
+            },
+            {
+                "command": "awsView.openTerminal",
+                "title": "Open SSM terminal (ssm-user)",
+                "category": "AWS View",
+                "icon": "$(terminal)"
+            },
+            {
+                "command": "awsView.editTags",
+                "title": "Edit tags\u2026",
+                "category": "AWS View",
+                "icon": "$(tag)"
+            },
+            {
+                "command": "awsView.rename",
+                "title": "Rename\u2026",
+                "category": "AWS View",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "awsView.pin",
+                "title": "Pin",
+                "category": "AWS View",
+                "icon": "$(pin)"
+            },
+            {
+                "command": "awsView.unpin",
+                "title": "Unpin",
+                "category": "AWS View",
+                "icon": "$(pinned)"
+            },
+            {
+                "command": "awsView.setSshUser",
+                "title": "Set SSH user\u2026",
+                "category": "AWS View"
+            },
+            {
+                "command": "awsView.setFallbackKey",
+                "title": "Set fallback SSH key\u2026",
+                "category": "AWS View"
+            },
+            {
+                "command": "awsView.copyInstanceId",
+                "title": "Copy instance ID",
+                "category": "AWS View"
+            },
+            {
+                "command": "awsView.runDoctor",
+                "title": "Run Doctor",
+                "category": "AWS View",
+                "icon": "$(checklist)"
+            },
+            {
+                "command": "awsView.remoteActions",
+                "title": "Instance of this window\u2026",
+                "category": "AWS View"
+            }
+        ],
+        "menus": {
+            "view/title": [
+                {
+                    "command": "awsView.selectProfile",
+                    "when": "view == awsView.instances",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "awsView.selectRegion",
+                    "when": "view == awsView.instances",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "awsView.filter",
+                    "when": "view == awsView.instances",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "awsView.refresh",
+                    "when": "view == awsView.instances",
+                    "group": "navigation@4"
+                },
+                {
+                    "command": "awsView.togglePinnedOnly",
+                    "when": "view == awsView.instances",
+                    "group": "more@1"
+                },
+                {
+                    "command": "awsView.clearFilter",
+                    "when": "view == awsView.instances",
+                    "group": "more@2"
+                },
+                {
+                    "command": "awsView.signOut",
+                    "when": "view == awsView.instances",
+                    "group": "more@3"
+                },
+                {
+                    "command": "awsView.runDoctor",
+                    "when": "view == awsView.instances",
+                    "group": "more@4"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "awsView.start",
+                    "when": "view == awsView.instances && viewItem =~ /^instance.*:start/",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "awsView.openRemote",
+                    "when": "view == awsView.instances && viewItem =~ /^instance.*:remote/",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "awsView.openTerminal",
+                    "when": "view == awsView.instances && viewItem =~ /^instance.*:terminal/",
+                    "group": "inline@3"
+                },
+                {
+                    "command": "awsView.stop",
+                    "when": "view == awsView.instances && viewItem =~ /^instance.*:stop/",
+                    "group": "inline@4"
+                },
+                {
+                    "command": "awsView.editTags",
+                    "when": "view == awsView.instances && viewItem =~ /^instance/",
+                    "group": "1_edit@1"
+                },
+                {
+                    "command": "awsView.rename",
+                    "when": "view == awsView.instances && viewItem =~ /^instance/",
+                    "group": "1_edit@2"
+                },
+                {
+                    "command": "awsView.pin",
+                    "when": "view == awsView.instances && viewItem =~ /^instance.*:unpinned/",
+                    "group": "2_pin@1"
+                },
+                {
+                    "command": "awsView.unpin",
+                    "when": "view == awsView.instances && viewItem =~ /^instance.*:pinned(:|$)/",
+                    "group": "2_pin@1"
+                },
+                {
+                    "command": "awsView.setSshUser",
+                    "when": "view == awsView.instances && viewItem =~ /^instance/",
+                    "group": "3_ssh@1"
+                },
+                {
+                    "command": "awsView.setFallbackKey",
+                    "when": "view == awsView.instances && viewItem =~ /^instance/",
+                    "group": "3_ssh@2"
+                },
+                {
+                    "command": "awsView.copyInstanceId",
+                    "when": "view == awsView.instances && viewItem =~ /^instance/",
+                    "group": "4_copy@1"
+                }
+            ],
+            "commandPalette": [
+                {
+                    "command": "awsView.start",
+                    "when": "false"
+                },
+                {
+                    "command": "awsView.stop",
+                    "when": "false"
+                },
+                {
+                    "command": "awsView.openRemote",
+                    "when": "false"
+                },
+                {
+                    "command": "awsView.openTerminal",
+                    "when": "false"
+                },
+                {
+                    "command": "awsView.editTags",
+                    "when": "false"
+                },
+                {
+                    "command": "awsView.rename",
+                    "when": "false"
+                },
+                {
+                    "command": "awsView.pin",
+                    "when": "false"
+                },
+                {
+                    "command": "awsView.unpin",
+                    "when": "false"
+                },
+                {
+                    "command": "awsView.setSshUser",
+                    "when": "false"
+                },
+                {
+                    "command": "awsView.setFallbackKey",
+                    "when": "false"
+                },
+                {
+                    "command": "awsView.copyInstanceId",
+                    "when": "false"
+                }
+            ]
+        },
+        "configuration": {
+            "title": "AWS View",
+            "properties": {
+                "awsView.regions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "markdownDescription": "Regions offered by **Select region**. Empty: the region of the selected profile."
+                },
+                "awsView.defaultTagFilters": {
+                    "type": "array",
+                    "default": [],
+                    "markdownDescription": "Tag filters applied until you change the filter, e.g. `[{ \"key\": \"Owner\", \"values\": [\"alice\"] }]`. An empty `values` list matches every instance that has the tag.",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "key"
+                        ],
+                        "additionalProperties": false,
+                        "properties": {
+                            "key": {
+                                "type": "string"
+                            },
+                            "values": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "default": []
+                            }
+                        }
+                    }
+                },
+                "awsView.idleReminder.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Remind you to stop instances that keep running."
+                },
+                "awsView.idleReminder.hours": {
+                    "type": "number",
+                    "default": 4,
+                    "minimum": 0.01,
+                    "description": "Remind after an instance has been running this many hours."
+                },
+                "awsView.confirmStop": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Ask for confirmation before stopping an instance."
+                },
+                "awsView.awsCliPath": {
+                    "type": "string",
+                    "scope": "machine",
+                    "default": "aws",
+                    "markdownDescription": "Path of the AWS CLI v2 executable. Read from **User** settings only."
+                },
+                "awsView.sshConfigPath": {
+                    "type": "string",
+                    "scope": "machine",
+                    "default": "~/.ssh/aws-view.config",
+                    "markdownDescription": "File where AWS View writes its SSH hosts (included from `~/.ssh/config`). Read from **User** settings only."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "build": "node esbuild.config.mjs && vite build",
+        "watch": "node esbuild.config.mjs --watch",
+        "typecheck": "tsc -p src && tsc -p webview-ui && tsc -p test && tsc -p test/integration",
+        "lint": "biome check .",
+        "test": "vitest run",
+        "test:coverage": "vitest run --coverage",
+        "package": "vsce package --no-dependencies",
+        "test:integration": "vscode-test",
+        "pretest:integration": "esbuild test/integration/*.test.ts --bundle --platform=node --format=cjs --external:vscode --outdir=out/test/integration --log-level=warning"
+    },
+    "dependencies": {
+        "@aws-sdk/client-ec2": "catalog:",
+        "@aws-sdk/client-ssm": "catalog:",
+        "@aws-sdk/client-sts": "catalog:",
+        "@aws-sdk/credential-providers": "catalog:",
+        "@needle-di/core": "catalog:",
+        "vscode-messenger": "catalog:",
+        "vscode-messenger-common": "catalog:"
+    },
+    "devDependencies": {
+        "@testing-library/react": "catalog:",
+        "@types/mocha": "catalog:",
+        "@types/node": "catalog:",
+        "@types/react": "catalog:",
+        "@types/react-dom": "catalog:",
+        "@types/vscode": "1.125.0",
+        "@vitejs/plugin-react": "catalog:",
+        "@vitest/coverage-v8": "catalog:",
+        "@vscode-elements/elements": "catalog:",
+        "@vscode-elements/react-elements": "catalog:",
+        "@vscode/codicons": "catalog:",
+        "@vscode/test-cli": "catalog:",
+        "@vscode/test-electron": "catalog:",
+        "@vscode/vsce": "catalog:",
+        "aws-sdk-client-mock": "catalog:",
+        "esbuild": "catalog:",
+        "happy-dom": "catalog:",
+        "react": "catalog:",
+        "react-dom": "catalog:",
+        "typescript": "catalog:",
+        "vite": "catalog:",
+        "vitest": "catalog:",
+        "vscode-messenger-webview": "catalog:"
     }
-  },
-  "scripts": {
-    "build": "node esbuild.config.mjs && vite build",
-    "watch": "node esbuild.config.mjs --watch",
-    "typecheck": "tsc -p src && tsc -p webview-ui && tsc -p test && tsc -p test/integration",
-    "lint": "biome check .",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "package": "vsce package --no-dependencies",
-    "test:integration": "vscode-test",
-    "pretest:integration": "esbuild test/integration/*.test.ts --bundle --platform=node --format=cjs --external:vscode --outdir=out/test/integration --log-level=warning"
-  },
-  "dependencies": {
-    "@aws-sdk/client-ec2": "catalog:",
-    "@aws-sdk/client-ssm": "catalog:",
-    "@aws-sdk/client-sts": "catalog:",
-    "@aws-sdk/credential-providers": "catalog:",
-    "@needle-di/core": "catalog:",
-    "vscode-messenger": "catalog:",
-    "vscode-messenger-common": "catalog:"
-  },
-  "devDependencies": {
-    "@testing-library/react": "catalog:",
-    "@types/mocha": "catalog:",
-    "@types/node": "catalog:",
-    "@types/react": "catalog:",
-    "@types/react-dom": "catalog:",
-    "@types/vscode": "1.125.0",
-    "@vitejs/plugin-react": "catalog:",
-    "@vitest/coverage-v8": "catalog:",
-    "@vscode-elements/elements": "catalog:",
-    "@vscode-elements/react-elements": "catalog:",
-    "@vscode/codicons": "catalog:",
-    "@vscode/test-cli": "catalog:",
-    "@vscode/test-electron": "catalog:",
-    "@vscode/vsce": "catalog:",
-    "aws-sdk-client-mock": "catalog:",
-    "esbuild": "catalog:",
-    "happy-dom": "catalog:",
-    "react": "catalog:",
-    "react-dom": "catalog:",
-    "typescript": "catalog:",
-    "vite": "catalog:",
-    "vitest": "catalog:",
-    "vscode-messenger-webview": "catalog:"
-  }
 }
