@@ -16,6 +16,7 @@ import { matchesAnnotations, parseAnnotationFilter } from "../core/resource/anno
 import { formatAge } from "../core/resource/format";
 import { isSecretKind, type KubeResource } from "../core/resource/KubeResource";
 import { httpRouteUrls, ingressUrls, parentGateways } from "../core/resource/routeUrls";
+import { type ScopeDirection, scopeSourceOf } from "../core/view/ScopeResolver";
 import { StatusEvaluator } from "../core/view/StatusEvaluator";
 import type { ConfigLoader } from "../infra/config/ConfigLoader";
 import type { KubernetesExtensionGateway } from "../infra/ms-kubernetes/KubernetesExtensionGateway";
@@ -130,6 +131,8 @@ export function registerCommands(d: CommandDeps): vscode.Disposable[] {
     reg("k8sView.helmShowValues", (arg) => showHelmValues(d, arg, "values")),
     reg("k8sView.helmShowDefaultValues", (arg) => showHelmValues(d, arg, "defaults")),
     reg("k8sView.findPods", (arg) => findPods(d, arg)),
+    reg("k8sView.openRelated", (arg) => openScoped(d, arg, "related")),
+    reg("k8sView.openParent", (arg) => openScoped(d, arg, "parents")),
     reg("k8sView.stopPortForward", (node) => {
       if (isPortForwardNode(node)) d.portForwards.stop(node.info.id);
     }),
@@ -426,6 +429,26 @@ function toRef(d: CommandDeps, arg: unknown): ResourceRefArg | undefined {
     return { context: ctx.name, group: r.kind.group, kind: r.kind.kind, namespace: r.namespace, name: r.name };
   }
   return undefined;
+}
+
+/** Open Related / Open Parent from a command or tree node: a table tab scoped to the resource's relations. */
+async function openScoped(d: CommandDeps, arg: unknown, direction: ScopeDirection): Promise<void> {
+  const ref = toRef(d, arg);
+  const ctx = d.contexts.current;
+  if (!ref || !ctx) return;
+  if (ref.context && ref.context !== ctx.name)
+    throw new Error(vscode.l10n.t("Context {0} is not selected", ref.context));
+  const namespace = ref.namespace || undefined;
+  let resource = d.source
+    .lookup(ctx)
+    .list(ref.group, ref.kind, namespace)
+    ?.find((r) => r.name === ref.name && r.namespace === namespace);
+  if (!resource) {
+    const kind = await d.source.resolveKind(ctx, { group: ref.group, kind: ref.kind });
+    if (!kind) throw new Error(vscode.l10n.t("Unknown kind {0}", ref.kind));
+    resource = await d.source.get(ctx, kind, namespace, ref.name);
+  }
+  d.tables.openScoped(direction, scopeSourceOf(resource));
 }
 
 /**

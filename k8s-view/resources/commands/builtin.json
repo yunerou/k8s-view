@@ -54,6 +54,50 @@
       "run": { "type": "vscode", "command": "k8sView.copyToClipboard", "args": ["${name}"] }
     },
     {
+      "id": "k8s.openRelated",
+      "title": "Open Related",
+      "group": "General",
+      "icon": "references",
+      "order": 4,
+      // Table tab with the resources this one leads to through the view's children (Pods of a Deployment…).
+      "match": [{ "group": "*", "kind": "*" }],
+      "run": {
+        "type": "vscode",
+        "command": "k8sView.openRelated",
+        "args": [
+          {
+            "context": "${context}",
+            "group": "${group}",
+            "kind": "${kind}",
+            "namespace": "${namespace}",
+            "name": "${name}"
+          }
+        ]
+      }
+    },
+    {
+      "id": "k8s.openParent",
+      "title": "Open Parent",
+      "group": "General",
+      "icon": "arrow-up",
+      "order": 5,
+      // Table tab with owners and the resources that select or reference this one.
+      "match": [{ "group": "*", "kind": "*" }],
+      "run": {
+        "type": "vscode",
+        "command": "k8sView.openParent",
+        "args": [
+          {
+            "context": "${context}",
+            "group": "${group}",
+            "kind": "${kind}",
+            "namespace": "${namespace}",
+            "name": "${name}"
+          }
+        ]
+      }
+    },
+    {
       "id": "pod.logs",
       "title": "Logs",
       "group": "Logs",

@@ -201,4 +201,20 @@ describe("built-in and preset config files", () => {
       }
     }
   });
+
+  test("Open Related and Open Parent apply to every kind", () => {
+    const parsed = parseConfigText(readFileSync(join(root, "commands/builtin.json"), "utf8"));
+    for (const [id, vscodeCommand] of [
+      ["k8s.openRelated", "k8sView.openRelated"],
+      ["k8s.openParent", "k8sView.openParent"],
+    ] as const) {
+      const config = parsed.commands.find((c) => c.config.id === id)?.config as CommandConfig | undefined;
+      expect(config, id).toBeDefined();
+      const command = compileCommand(config as CommandConfig, "builtin", engine).command;
+      expect(command?.matches(res(kinds.configMap, "cm"))).toBe(true);
+      expect(command?.matches(res(kinds.deployment, "web"))).toBe(true);
+      expect(command?.dangerous).toBe(false);
+      expect(JSON.stringify(config?.run)).toContain(vscodeCommand);
+    }
+  });
 });

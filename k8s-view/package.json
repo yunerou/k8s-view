@@ -176,6 +176,18 @@
                 "icon": "$(search)"
             },
             {
+                "command": "k8sView.openRelated",
+                "title": "Open Related",
+                "category": "K8s View",
+                "icon": "$(references)"
+            },
+            {
+                "command": "k8sView.openParent",
+                "title": "Open Parent",
+                "category": "K8s View",
+                "icon": "$(arrow-up)"
+            },
+            {
                 "command": "k8sView.createSnippet",
                 "title": "Create snippet…",
                 "category": "K8s View",
@@ -379,6 +391,14 @@
         ],
         "menus": {
             "commandPalette": [
+                {
+                    "command": "k8sView.openRelated",
+                    "when": "false"
+                },
+                {
+                    "command": "k8sView.openParent",
+                    "when": "false"
+                },
                 {
                     "command": "k8sView.runCommand",
                     "when": "false"
