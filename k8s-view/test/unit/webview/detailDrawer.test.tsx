@@ -28,7 +28,7 @@ beforeEach(() => {
   respond.mockImplementation((method, params) => {
     if (method === "table/related") return (params as { key: string }).key === "root" ? root : children;
     if (method === "table/details")
-      return { overview: [], yaml: "", events: [], conditions: [], related: root } satisfies RowDetails;
+      return { overview: [], yaml: "", events: [], conditions: [], related: root, parents: [] } satisfies RowDetails;
     return undefined;
   });
 });
@@ -79,7 +79,15 @@ describe("Documentation", () => {
   };
 
   test("shows the official guide and asks the extension to open it", async () => {
-    respond.mockResolvedValue({ overview: [], yaml: "", events: [], conditions: [], related: [], documentation });
+    respond.mockResolvedValue({
+      overview: [],
+      yaml: "",
+      events: [],
+      conditions: [],
+      related: [],
+      parents: [],
+      documentation,
+    });
     render(<DetailDrawer sectionId="deployments" uid="d1" title="Deployment web" onClose={vi.fn()} />);
     const link = await screen.findByRole("link", { name: "Deployment guide" });
     expect(link.getAttribute("href")).toBe(documentation.url);
@@ -98,7 +106,7 @@ describe("Documentation", () => {
   test("reports browser-opening failures", async () => {
     respond.mockImplementation((method) => {
       if (method === "table/details")
-        return { overview: [], yaml: "", events: [], conditions: [], related: [], documentation };
+        return { overview: [], yaml: "", events: [], conditions: [], related: [], parents: [], documentation };
       if (method === "table/openDocumentation") throw new Error("Browser unavailable");
     });
     render(<DetailDrawer sectionId="deployments" uid="d1" title="Deployment web" onClose={vi.fn()} />);

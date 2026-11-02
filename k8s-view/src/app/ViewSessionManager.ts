@@ -1,5 +1,8 @@
 import { inject, injectable } from "@needle-di/core";
 import * as vscode from "vscode";
+import type { KubeResource } from "../core/resource/KubeResource";
+import type { ParentIndex } from "../core/view/ParentIndex";
+import type { StatusResult } from "../core/view/StatusEvaluator";
 import { ContextService } from "./ContextService";
 import { ResourceSource } from "./ports/ResourceSource";
 import { Settings } from "./ports/Settings";
@@ -24,6 +27,20 @@ export class ViewSessionManager implements vscode.Disposable {
   ) {
     this.subscription = registry.onDidChange(() => this.sync());
     this.sync();
+  }
+
+  get parentIndex(): ParentIndex {
+    return this.registry.parentIndex;
+  }
+
+  /** Status of a resource using the first section (any view) that lists its kind. */
+  statusOf(r: KubeResource): StatusResult | undefined {
+    for (const v of this.registry.views()) {
+      for (const s of v.definition.sections) {
+        if (s.resources.some((x) => x.group === r.kind.group && x.kind === r.kind.kind)) return s.status(r);
+      }
+    }
+    return undefined;
   }
 
   session(viewId: string): ViewSession | undefined {

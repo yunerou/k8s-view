@@ -3,6 +3,7 @@ import type { ClusterContext } from "../core/context/ClusterContext";
 import { stringify } from "../core/expression/ExpressionEngine";
 import type { KubeResource } from "../core/resource/KubeResource";
 import { metricRef, withResourceMetrics } from "../core/resource/resourceMetrics";
+import type { ParentHit, ParentIndex } from "../core/view/ParentIndex";
 import type { ChildItem, KindDemand } from "../core/view/RelationResolver";
 import type { ChildDefinition, SectionDefinition, ViewDefinition } from "../core/view/ViewDefinition";
 import type { ContextService } from "./ContextService";
@@ -29,6 +30,12 @@ export interface ChildContent {
   readonly items: readonly ChildItem[];
   readonly pending: boolean;
   /** Hint instead of an error (e.g. missing cluster-wide list permission). */
+  readonly hints: readonly string[];
+}
+
+export interface ParentContent {
+  readonly items: readonly ParentHit[];
+  readonly pending: boolean;
   readonly hints: readonly string[];
 }
 
@@ -234,6 +241,26 @@ export class ViewSession implements vscode.Disposable {
       });
     this.hold(nodeKey, demands);
     return out;
+  }
+
+  /** Parents of `child` (owners + reversed view relations); leases are held under `nodeKey` until `closeNode`. */
+  openParents(nodeKey: string, child: KubeResource, index: ParentIndex): ParentContent {
+    const ctx = this.context;
+    if (!ctx) return { items: [], pending: false, hints: [] };
+    const lookup = this.source.lookup(ctx);
+    const result = index.parents(child, lookup, ctx.scope.type === "all");
+    const demands: KindDemand[] = [...result.demands];
+    const hints: string[] = [];
+    for (const d of result.demands) {
+      if (d.namespace === undefined && ctx.namespace && lookup.entry(d, undefined)?.state === "forbidden") {
+        demands.push({ ...d, namespace: ctx.namespace });
+        hints.push(
+          `Showing ${d.kind} from only namespace ${ctx.namespace}: no permission to list them in all namespaces.`,
+        );
+      }
+    }
+    this.hold(nodeKey, demands);
+    return { items: result.items, pending: result.pending, hints };
   }
 
   /** Release leases for the node and all its descendants. */

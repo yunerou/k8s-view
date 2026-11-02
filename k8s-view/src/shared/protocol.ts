@@ -226,6 +226,7 @@ export interface RowDetails {
   readonly events: readonly EventInfo[];
   readonly conditions: readonly ConditionInfo[];
   readonly related: readonly RelatedGroup[];
+  readonly parents: readonly RelatedGroup[];
 }
 
 export const TableRequests = {
@@ -247,6 +248,8 @@ export const TableRequests = {
   details: { method: "table/details" } as RequestType<RowRef, RowDetails>,
   openDocumentation: { method: "table/openDocumentation" } as RequestType<RowRef, void>,
   related: { method: "table/related" } as RequestType<{ key: string }, readonly RelatedGroup[]>,
+  /** Parents of a drawer node (`table:parents:<uid>` or one of its items). */
+  parents: { method: "table/parents" } as RequestType<{ key: string }, readonly RelatedGroup[]>,
   closeRelated: { method: "table/closeRelated" } as RequestType<{ key: string; dispose?: boolean }, void>,
   openManifest: { method: "table/openManifest" } as RequestType<RowRef, void>,
   savePrefs: { method: "table/savePrefs" } as RequestType<{ sectionId: string; prefs: SectionPrefs }, void>,

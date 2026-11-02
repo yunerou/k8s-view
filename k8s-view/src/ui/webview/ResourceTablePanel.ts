@@ -15,10 +15,11 @@ import { ViewSessionManager } from "../../app/ViewSessionManager";
 import { formatAge } from "../../core/resource/format";
 import type { KubeResource } from "../../core/resource/KubeResource";
 import { resourceDocumentation } from "../../core/resource/resourceDocumentation";
+import type { ParentVia } from "../../core/view/ParentIndex";
 import type { ChildDefinition } from "../../core/view/ViewDefinition";
 import { EXTENSION_CONTEXT } from "../../di/tokens";
 import type { HotkeyAction } from "../../shared/hotkeys";
-import type { RelatedGroup } from "../../shared/protocol";
+import type { RelatedGroup, RelatedItem } from "../../shared/protocol";
 import {
   type CommandItem,
   type RowDetails,
@@ -33,6 +34,13 @@ import {
 import { ConfigWriter } from "../ConfigWriter";
 import { ManifestDocumentProvider } from "../ManifestDocumentProvider";
 import { webviewHtml, webviewOptions } from "./html";
+
+const VIA_LABEL: Record<ParentVia, string> = {
+  owner: "owner",
+  selects: "selects this",
+  references: "references this",
+  referencedBy: "referenced by this",
+};
 
 const prefsKey = (viewId: string) => `k8sView.tablePrefs/${viewId}`;
 
@@ -153,6 +161,8 @@ class TablePanel implements vscode.Disposable {
   private resources = new Map<string, Map<string, KubeResource>>();
   private openSections = new Set<string>();
   private detailsKey: string | undefined;
+  private parentsKey: string | undefined;
+  private readonly parentNodes = new Map<string, KubeResource>();
   private readonly relatedNodes = new Map<string, { resource: KubeResource; children: readonly ChildDefinition[] }>();
   private dirty = false;
   private readonly disposables: vscode.Disposable[] = [];
@@ -184,9 +194,10 @@ class TablePanel implements vscode.Disposable {
         if (url) await vscode.env.openExternal(vscode.Uri.parse(url));
       }),
       m.onRequest(TableRequests.related, ({ key }) => this.related(key)),
+      m.onRequest(TableRequests.parents, ({ key }) => this.parents(key)),
       m.onRequest(TableRequests.closeRelated, ({ key, dispose }) => {
         if (dispose && key === this.detailsKey) this.closeDetails();
-        else if (this.relatedNodes.has(key)) this.session?.closeNode(key);
+        else if (this.relatedNodes.has(key) || this.parentNodes.has(key)) this.session?.closeNode(key);
       }),
       m.onRequest(TableRequests.openManifest, async (ref) => {
         const [r] = this.resolve(ref.sectionId, [ref.uid]);
@@ -467,8 +478,64 @@ class TablePanel implements vscode.Disposable {
 
   private closeDetails(): void {
     if (this.detailsKey) this.session?.closeNode(this.detailsKey);
+    if (this.parentsKey) this.session?.closeNode(this.parentsKey);
     this.detailsKey = undefined;
+    this.parentsKey = undefined;
     this.relatedNodes.clear();
+    this.parentNodes.clear();
+  }
+
+  /** Latest copy of `r` from the store (relations are re-read on live updates). */
+  private fresh(r: KubeResource): KubeResource {
+    const ctx = this.owner.deps.contexts.current;
+    if (!ctx) return r;
+    return (
+      this.owner.deps.source
+        .lookup(ctx)
+        .list(r.kind.group, r.kind.kind, r.namespace)
+        ?.find((x) => x.uid === r.uid) ?? r
+    );
+  }
+
+  private parents(key: string): RelatedGroup[] {
+    const node = this.parentNodes.get(key);
+    const session = this.session;
+    if (!node || !session) return [];
+    const d = this.owner.deps;
+    const index = d.sessions.parentIndex;
+    const content = session.openParents(key, this.fresh(node), index);
+    const retained = new Set<string>();
+    const byKind = new Map<string, RelatedItem[]>();
+    for (const hit of content.items) {
+      const r = hit.resource;
+      const itemKey = `${key}/${r.uid}`;
+      retained.add(itemKey);
+      this.parentNodes.set(itemKey, r);
+      const status = d.sessions.statusOf(r);
+      const items = byKind.get(r.kind.kind) ?? [];
+      items.push({
+        key: itemKey,
+        expandable: index.hasParents(r),
+        kind: r.kind.kind,
+        name: r.name,
+        ...(r.namespace ? { namespace: r.namespace } : {}),
+        level: status?.level ?? "unknown",
+        description: hit.via.map((v) => VIA_LABEL[v]).join(", "),
+      });
+      byKind.set(r.kind.kind, items);
+    }
+    for (const oldKey of [...this.parentNodes.keys()]) {
+      if (oldKey.startsWith(`${key}/`) && ![...retained].some((k) => oldKey === k || oldKey.startsWith(`${k}/`))) {
+        session.closeNode(oldKey);
+        this.parentNodes.delete(oldKey);
+      }
+    }
+    const groups: RelatedGroup[] = [...byKind].map(([kind, items]) => ({ key: `${key}/${kind}`, title: kind, items }));
+    if (groups.length === 0 && (content.pending || content.hints.length > 0)) {
+      return [{ key: `${key}/-`, title: "Parents", pending: content.pending, hints: content.hints, items: [] }];
+    }
+    if (content.hints.length > 0 && groups[0]) groups[0] = { ...groups[0], hints: content.hints };
+    return groups;
   }
 
   private related(key: string): RelatedGroup[] {
@@ -477,11 +544,7 @@ class TablePanel implements vscode.Disposable {
     if (!node || !session) return [];
     const ctx = this.owner.deps.contexts.current;
     if (!ctx) return [];
-    const resource =
-      this.owner.deps.source
-        .lookup(ctx)
-        .list(node.resource.kind.group, node.resource.kind.kind, node.resource.namespace)
-        ?.find((r) => r.uid === node.resource.uid) ?? node.resource;
+    const resource = this.fresh(node.resource);
     const retained = new Set<string>();
     const groups = session.openChildren(key, resource, node.children).map((c) => ({
       key: `${key}/${c.def.id}`,
@@ -533,7 +596,7 @@ class TablePanel implements vscode.Disposable {
     const session = this.session;
     const [r] = this.resolve(ref.sectionId, [ref.uid]);
     const ctx = d.contexts.current;
-    if (!r || !session || !ctx) return { overview: [], yaml: "", events: [], conditions: [], related: [] };
+    if (!r || !session || !ctx) return { overview: [], yaml: "", events: [], conditions: [], related: [], parents: [] };
     const section = session.sectionDefinition(ref.sectionId);
     const status = section?.status(r);
     const age = r.ageMs(Date.now());
@@ -559,6 +622,9 @@ class TablePanel implements vscode.Disposable {
     this.detailsKey = `table:details:${r.uid}`;
     if (section) this.relatedNodes.set(this.detailsKey, { resource: r, children: section.children });
     const related = this.related(this.detailsKey);
+    this.parentsKey = `table:parents:${r.uid}`;
+    this.parentNodes.set(this.parentsKey, r);
+    const parents = this.parents(this.parentsKey);
     let events: RowDetails["events"] = [];
     try {
       events = (await d.source.events(ctx, r)).map((e) => ({
@@ -579,6 +645,7 @@ class TablePanel implements vscode.Disposable {
       events,
       conditions: r.conditions.map((c) => ({ ...c })),
       related,
+      parents,
     };
   }
 }

@@ -15,6 +15,7 @@ const details: RowDetails = {
   yaml: "apiVersion: apps/v1\nkind: Deployment\n",
   events: [{ type: "Warning", reason: "BackOff", message: "Back-off restarting", count: 3, lastTimestamp: undefined }],
   conditions: [{ type: "Available", status: "True" }],
+  parents: [],
   related: [{ title: "Pods", items: [{ kind: "Pod", name: "web-1", namespace: "default", level: "ok" }] }],
 };
 

@@ -110,6 +110,7 @@ beforeEach(async () => {
             },
           ],
         },
+        { id: "pods", title: "Pods", sections: [{ id: "pods", title: "Pods", resources: [{ kind: "Pod" }] }] },
       ],
       commands: [
         {
@@ -236,5 +237,57 @@ describe("table commands and related tree", () => {
     await request("details", { sectionId: "deployments", uid: second.uid });
     await request("closeRelated", { key: rootKey, dispose: true });
     expect(await request<RelatedGroup[]>("related", { key: `table:details:${second.uid}` })).toHaveLength(1);
+  });
+
+  test("details list parents grouped by kind and expand to grandparents", async () => {
+    source.addKind(kinds.replicaSet);
+    const rs = res(
+      kinds.replicaSet,
+      "web-1",
+      {
+        metadata: {
+          name: "web-1",
+          uid: "rs-web-1",
+          ownerReferences: [{ apiVersion: "apps/v1", kind: "Deployment", name: "web", uid: deployment.uid }],
+        },
+      },
+      "a",
+    );
+    const pod = res(
+      kinds.pod,
+      "web-1-x",
+      {
+        metadata: {
+          name: "web-1-x",
+          uid: "pod-web-1-x",
+          ownerReferences: [{ apiVersion: "apps/v1", kind: "ReplicaSet", name: "web-1", uid: rs.uid }],
+        },
+      },
+      "a",
+    );
+    source.set({ group: "apps", kind: "ReplicaSet" }, "a", [rs]);
+    source.set({ group: "", kind: "Pod" }, "a", [pod]);
+    await sessions.session("pods")!.whenReady();
+    tables.open("pods");
+    await request("getViewModel");
+    const details = await request<RowDetails>("details", { sectionId: "pods", uid: pod.uid });
+    expect(details.parents).toEqual([
+      {
+        key: `table:parents:${pod.uid}/ReplicaSet`,
+        title: "ReplicaSet",
+        items: [
+          expect.objectContaining({
+            key: `table:parents:${pod.uid}/${rs.uid}`,
+            kind: "ReplicaSet",
+            name: "web-1",
+            namespace: "a",
+            description: "owner",
+            expandable: true,
+          }),
+        ],
+      },
+    ]);
+    const up = await request<RelatedGroup[]>("parents", { key: `table:parents:${pod.uid}/${rs.uid}` });
+    expect(up.map((g) => [g.title, g.items.map((i) => i.name)])).toEqual([["Deployment", ["web"]]]);
   });
 });

@@ -6,6 +6,7 @@ import { ViewSchema } from "../../../src/core/config/schema";
 import { ExpressionEngine } from "../../../src/core/expression/ExpressionEngine";
 import { ResourceKind } from "../../../src/core/resource/ResourceKind";
 import { kindViewConfig } from "../../../src/core/view/kindView";
+import { ParentIndex } from "../../../src/core/view/ParentIndex";
 import { compileView } from "../../../src/core/view/ViewDefinition";
 import { FakeResourceSource } from "../helpers/FakeResourceSource";
 import { FakeClusterApi, FakeKubeConfig, FakeSettings, FakeState } from "../helpers/fakes";
@@ -363,4 +364,29 @@ test("missing Metrics Server keeps Pods and their requests visible", async () =>
   expect(content.problems).toContainEqual({ kind: "PodMetrics", state: "unavailable", message: undefined });
   expect(content.items[0]!.object["resourceMetrics"]).toMatchObject({ cpu: { used: undefined, request: 1 } });
   session.dispose();
+});
+
+describe("ViewSession parents", () => {
+  test("openParents finds owners and holds their leases until closeNode", async () => {
+    const session = await makeSession();
+    const deploy = res(kinds.deployment, "web", {}, "team-a");
+    const rs = res(
+      kinds.replicaSet,
+      "web-1",
+      {
+        metadata: {
+          name: "web-1",
+          uid: "rs-parent",
+          ownerReferences: [{ apiVersion: "apps/v1", kind: "Deployment", name: "web", uid: deploy.uid }],
+        },
+      },
+      "team-a",
+    );
+    source.set(deployRef, "team-a", [deploy]);
+    const content = session.openParents("node", rs, ParentIndex.build([workload.definition]));
+    expect(content.items.map((h) => [h.resource.name, h.via])).toEqual([["web", ["owner"]]]);
+    expect(source.active()).toContain("apps/Deployment|team-a");
+    session.closeNode("node");
+    expect(source.active()).not.toContain("apps/Deployment|team-a");
+  });
 });
