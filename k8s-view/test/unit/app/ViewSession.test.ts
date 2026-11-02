@@ -458,6 +458,47 @@ describe("scoped sessions", () => {
     expect(source.active()).toEqual([]);
   });
 
+  test("resolves the scope once for all sections and holds its leases until the last section closes", async () => {
+    const deploy = res(kinds.deployment, "web", {}, "team-a");
+    const rs = res(
+      kinds.replicaSet,
+      "web-1",
+      { metadata: { name: "web-1", uid: "rs-sc2", ownerReferences: [owner(deploy)] } },
+      "team-a",
+    );
+    const pod = res(
+      kinds.pod,
+      "web-1-a",
+      { metadata: { name: "web-1-a", uid: "p-sc2", ownerReferences: [owner(rs)] } },
+      "team-a",
+    );
+    source.set(deployRef, "team-a", [deploy]);
+    source.set(rsRef, "team-a", [rs]);
+    source.set(podRef, "team-a", [pod]);
+    const base = scoped(deploy);
+    const view = registered({
+      id: base.id,
+      title: "Related",
+      sections: [
+        { id: "replicaset.apps", title: "ReplicaSets", resources: [{ group: "apps", kind: "ReplicaSet" }] },
+        { id: "pod", title: "Pods", resources: [{ kind: "Pod" }] },
+      ],
+    });
+    const session = await makeSession({ ...view, dynamic: true, scope: base.scope! });
+    const lookups = vi.spyOn(source, "lookup");
+    for (let i = 0; i < 2; i++) {
+      expect(session.openSection("replicaset.apps", "table").items.map((r) => r.name)).toEqual(["web-1"]);
+      expect(session.openSection("pod", "table").items.map((r) => r.name)).toEqual(["web-1-a"]);
+    }
+    // One lookup per section call, plus a single scope resolution.
+    expect(lookups).toHaveBeenCalledTimes(5);
+    expect(source.acquired.filter((k) => k === "apps/Deployment|team-a")).toHaveLength(1);
+    session.closeSection("pod", "table");
+    expect(source.active()).toContain("apps/Deployment|team-a");
+    session.closeSection("replicaset.apps", "table");
+    expect(source.active()).toEqual([]);
+  });
+
   test("reports a missing source", async () => {
     const deploy = res(kinds.deployment, "web", {}, "team-a");
     source.set(deployRef, "team-a", []);

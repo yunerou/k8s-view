@@ -66,6 +66,12 @@ export class ViewSession implements vscode.Disposable {
   private generation = 0;
   private scopeEnabled = true;
   private sourceMissing = false;
+  /** Scope resolution shared by every section until the store, context, index or scope toggle changes. */
+  private scopeCache:
+    | { readonly ctx: ClusterContext; readonly index: ParentIndex; readonly result: ScopeResolution }
+    | undefined;
+  /** Open scoped sections per lease owner (`tree`/`table`); the scope's leases live under `<owner>:scope`. */
+  private readonly scopedSections = new Map<string, Set<string>>();
   private readonly disposables: vscode.Disposable[] = [];
 
   constructor(
@@ -78,7 +84,9 @@ export class ViewSession implements vscode.Disposable {
     this.disposables.push(
       contexts.onDidChange(() => this.reset()),
       source.onDidChange((c) => {
-        if (c.context === this.context?.name && this.watches(c.kindKey)) this.schedule();
+        if (c.context !== this.context?.name) return;
+        this.scopeCache = undefined;
+        if (this.watches(c.kindKey)) this.schedule();
       }),
     );
     this.ready = this.computeAvailability();
@@ -141,6 +149,7 @@ export class ViewSession implements vscode.Disposable {
   setScopeEnabled(enabled: boolean): void {
     if (this.scopeEnabled === enabled) return;
     this.scopeEnabled = enabled;
+    this.scopeCache = undefined;
     this.changed.fire();
   }
 
@@ -150,23 +159,38 @@ export class ViewSession implements vscode.Disposable {
       : undefined;
   }
 
-  /** Resolve the view's scope (when enabled) and hold leases for the kinds it needs under `owner`. */
+  /**
+   * Resolve the view's scope (when enabled; once per store change, shared by all sections) and hold leases for the
+   * kinds it needs under `<owner>:scope` while a scoped section of `owner` is open.
+   */
   private activeScope(
     ctx: ClusterContext,
     owner: string,
+    sectionId: string,
   ): { readonly source: ScopeSource; readonly result: ScopeResolution } | undefined {
     const scope = this.registered.scope;
-    if (!scope || !this.scopeEnabled) {
-      this.release(owner);
+    if (!scope) return undefined;
+    const leaseOwner = `${owner}:scope`;
+    const open = this.scopedSections.get(owner) ?? new Set<string>();
+    open.add(sectionId);
+    this.scopedSections.set(owner, open);
+    if (!this.scopeEnabled) {
+      this.release(leaseOwner);
       this.sourceMissing = false;
       return undefined;
     }
     if (scope.context !== ctx.name) {
-      this.release(owner);
+      this.release(leaseOwner);
       return { source: scope.source, result: EMPTY_SCOPE_RESOLUTION };
     }
-    const result = resolveScope(scope, this.source.lookup(ctx), this.parentIndex(), ctx.scope.type === "all");
-    this.hold(owner, result.demands);
+    const index = this.parentIndex();
+    const cached = this.scopeCache;
+    const result =
+      cached && cached.ctx === ctx && cached.index === index
+        ? cached.result
+        : resolveScope(scope, this.source.lookup(ctx), index, ctx.scope.type === "all");
+    this.scopeCache = { ctx, index, result };
+    this.hold(leaseOwner, result.demands);
     this.sourceMissing = result.sourceMissing;
     return { source: scope.source, result };
   }
@@ -178,7 +202,7 @@ export class ViewSession implements vscode.Disposable {
     if (!section || !ctx) return { state: "ready", items: [], groups: undefined, problems: [] };
     const refs = section.resources.filter((r) => this.kindAvailable.get(kindKey(r)) === true);
     const lookup = this.source.lookup(ctx);
-    const scope = this.activeScope(ctx, `${owner}:section:${id}:scope`);
+    const scope = this.activeScope(ctx, owner, id);
     const namespace = scope ? scope.source.namespace : section.allNamespaces ? undefined : ctx.namespace;
     /** Scoped sections watch where the scope's resources live; without list permission there, fall back to the source's namespace. */
     const namespacesOf = (ref: KindRef): (string | undefined)[] => {
@@ -278,7 +302,10 @@ export class ViewSession implements vscode.Disposable {
 
   closeSection(id: string, owner = "tree"): void {
     this.release(`${owner}:section:${id}`);
-    this.release(`${owner}:section:${id}:scope`);
+    const open = this.scopedSections.get(owner);
+    if (!open?.delete(id) || open.size > 0) return;
+    this.scopedSections.delete(owner);
+    this.release(`${owner}:scope`);
   }
 
   /** Node children resolved through relations; leases are held under `nodeKey` until `closeNode`. */
@@ -431,6 +458,8 @@ export class ViewSession implements vscode.Disposable {
 
   private releaseAll(): void {
     for (const owner of [...this.owners.keys()]) this.release(owner);
+    this.scopedSections.clear();
+    this.scopeCache = undefined;
   }
 
   private watches(kind: string): boolean {
