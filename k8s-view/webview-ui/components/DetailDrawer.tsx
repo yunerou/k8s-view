@@ -256,17 +256,36 @@ export function DetailDrawer({ sectionId, uid, title, onClose, ...controlled }: 
             ])}
           />
         )}
-        {details && tab === "related" && (
-          <RelatedTree key={reload} nodeKey={`table:details:${uid}`} initial={details.related} />
-        )}
-        {details && tab === "parent" && (
-          <RelatedTree
-            key={reload}
-            nodeKey={`table:parents:${uid}`}
-            initial={details.parents}
-            request="parents"
-            emptyText={l10n.t("No parents.")}
-          />
+        {details && (tab === "related" || tab === "parent") && (
+          <>
+            <div className="drawer-tab-actions">
+              <button
+                type="button"
+                className="toolbar-button"
+                onClick={() =>
+                  request(TableRequests.openScoped, {
+                    sectionId,
+                    uid,
+                    direction: tab === "parent" ? "parents" : "related",
+                  }).catch((e: unknown) => setError(errorMessage(e)))
+                }
+              >
+                <Codicon name="link-external" />
+                <span>{l10n.t("Open in table")}</span>
+              </button>
+            </div>
+            {tab === "related" ? (
+              <RelatedTree key={reload} nodeKey={`table:details:${uid}`} initial={details.related} />
+            ) : (
+              <RelatedTree
+                key={reload}
+                nodeKey={`table:parents:${uid}`}
+                initial={details.parents}
+                request="parents"
+                emptyText={l10n.t("No parents.")}
+              />
+            )}
+          </>
         )}
       </div>
     </aside>

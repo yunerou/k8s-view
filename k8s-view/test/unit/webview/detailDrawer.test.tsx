@@ -161,6 +161,12 @@ describe("Parent tab", () => {
     expect(requests("table/parents")).toContainEqual({ key: "table:parents:p1/rs1" });
   });
 
+  test("Open in table opens the scoped tab for the current tab's direction", async () => {
+    render(<DetailDrawer sectionId="pods" uid="p1" title="Pod web-1" onClose={vi.fn()} tab="parent" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Open in table" }));
+    expect(requests("table/openScoped")).toEqual([{ sectionId: "pods", uid: "p1", direction: "parents" }]);
+  });
+
   test("empty parents say so", async () => {
     respond.mockImplementation((method) =>
       method === "table/details"

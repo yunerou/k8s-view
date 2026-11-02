@@ -33,6 +33,38 @@ body {
   font-weight: 600;
 }
 
+.scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 0 8px;
+  border-radius: 11px;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+}
+
+.scope-chip.off {
+  background: transparent;
+  border: 1px dashed var(--vscode-badge-background);
+  color: inherit;
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.drawer-tab-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
 .table-app > .banner,
 .section-panel > .banner {
   margin: 4px 12px;

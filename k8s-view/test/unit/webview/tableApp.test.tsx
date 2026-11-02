@@ -328,4 +328,33 @@ describe("TableApp hotkeys", () => {
     press(cellOf("a"), { key: "d", code: "KeyD" });
     await screen.findByRole("complementary", { name: /Details of Deployment default\/a/ });
   });
+
+  test("scoped tabs show the scope chip, toggle it and remember the scope", async () => {
+    const scope = {
+      direction: "related" as const,
+      context: "dev",
+      source: { group: "apps", kind: "Deployment", namespace: "a", name: "web", uid: "d1" },
+      enabled: true,
+      sourceMissing: true,
+    };
+    respond.mockImplementation((method) => {
+      if (method === "table/getViewModel") return { ...vm, viewId: "related.d1", scope };
+      return undefined;
+    });
+    render(<TableApp />);
+    expect(await screen.findByText("Deployment a/web")).toBeTruthy();
+    expect(screen.getByText("Deployment web no longer exists.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Turn off scope" }));
+    expect(requests("table/setScopeEnabled")).toEqual([{ enabled: false }]);
+    fireEvent.click(screen.getByRole("button", { name: "Deployment a/web" }));
+    expect(requests("table/openScopeSource")).toHaveLength(1);
+    await waitFor(() =>
+      expect(messengerModule.setWebviewState).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          viewId: "related.d1",
+          scope: { direction: "related", context: "dev", source: scope.source },
+        }),
+      ),
+    );
+  });
 });

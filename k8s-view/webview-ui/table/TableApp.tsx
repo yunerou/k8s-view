@@ -15,6 +15,7 @@ import { ContextMenu } from "../components/ContextMenu";
 import { DetailDrawer, type DetailTab, isDetailTab } from "../components/DetailDrawer";
 import { HotkeyHelp } from "../components/HotkeyHelp";
 import { type GridHandle, ResourceGrid } from "../components/ResourceGrid";
+import { ScopeChip } from "../components/ScopeChip";
 import { SectionToolbar } from "../components/SectionToolbar";
 import { Tabs } from "../components/Tabs";
 import { errorMessage, useDebounced, useNotification } from "../shared/hooks";
@@ -118,6 +119,9 @@ export function TableApp() {
       prefs,
       ...(activeId === undefined ? {} : { activeSection: activeId }),
       ...(drawerTab === "overview" ? {} : { drawerTab }),
+      ...(model.scope
+        ? { scope: { direction: model.scope.direction, context: model.scope.context, source: model.scope.source } }
+        : {}),
     });
   }, [model?.viewId, activeId, prefs, model, drawerTab]);
 
@@ -219,6 +223,13 @@ export function TableApp() {
         <span className="muted">
           {[model.context ?? l10n.t("No context"), scopeLabel(model.namespaceScope)].filter(Boolean).join(" · ")}
         </span>
+        {model.scope && (
+          <ScopeChip
+            scope={model.scope}
+            onToggle={(enabled) => request(TableRequests.setScopeEnabled, { enabled }).catch(report)}
+            onOpenSource={() => request(TableRequests.openScopeSource).catch(report)}
+          />
+        )}
         {hotkeys?.enabled && (
           <button
             type="button"
@@ -239,6 +250,11 @@ export function TableApp() {
       {notice && (
         <Banner kind="info" onDismiss={() => setNotice(undefined)}>
           {notice}
+        </Banner>
+      )}
+      {model.scope?.sourceMissing && (
+        <Banner kind="warning">
+          {l10n.t("{0} {1} no longer exists.", model.scope.source.kind, model.scope.source.name)}
         </Banner>
       )}
       <Tabs
