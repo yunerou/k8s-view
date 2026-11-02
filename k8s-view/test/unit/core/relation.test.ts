@@ -2,7 +2,13 @@ import { describe, expect, test } from "vitest";
 import { RelationSchema } from "../../../src/core/config/schema";
 import { ExpressionEngine } from "../../../src/core/expression/ExpressionEngine";
 import type { KubeResource } from "../../../src/core/resource/KubeResource";
-import { type ChildItem, CompiledRelation, type ResourceLookup } from "../../../src/core/view/RelationResolver";
+import { ResourceKind } from "../../../src/core/resource/ResourceKind";
+import {
+  apiGroup,
+  type ChildItem,
+  CompiledRelation,
+  type ResourceLookup,
+} from "../../../src/core/view/RelationResolver";
 import { kinds, res } from "../helpers/fixtures";
 
 const engine = new ExpressionEngine("safe");
@@ -210,4 +216,101 @@ describe("field", () => {
       { type: "field", label: "b", key: "b", description: "2" },
     ]);
   });
+});
+
+const nodeKind = new ResourceKind("", "v1", "Node", "nodes", false);
+
+describe("inverse", () => {
+  test("ownerRef finds the owner by uid among same-kind resources", () => {
+    const deploy = res(kinds.deployment, "web");
+    const rs = res(kinds.replicaSet, "web-1", {
+      metadata: {
+        name: "web-1",
+        uid: "rs-inv",
+        ownerReferences: [{ apiVersion: "apps/v1", kind: "Deployment", name: "web", uid: deploy.uid }],
+      },
+    });
+    const r = rel({ type: "ownerRef", group: "apps", kind: "ReplicaSet" }).inverse(
+      rs,
+      { group: "apps", kind: "Deployment" },
+      lookupOf([deploy, res(kinds.deployment, "api")]),
+    );
+    expect(names(r.items)).toEqual(["web"]);
+    expect(r.demands).toEqual([{ group: "apps", kind: "Deployment", namespace: "default" }]);
+  });
+
+  test("labelSelector returns same-namespace services whose selector matches the pod", () => {
+    const pod = res(kinds.pod, "web-1", { metadata: { name: "web-1", uid: "p-inv", labels: { app: "web" } } }, "a");
+    const web = res(kinds.service, "web", { spec: { selector: { app: "web" } } }, "a");
+    const headless = res(kinds.service, "headless", { spec: {} }, "a");
+    const otherNs = res(kinds.service, "web", { spec: { selector: { app: "web" } } }, "b");
+    const r = rel({ type: "labelSelector", kind: "Pod", selector: "$.spec.selector" }).inverse(
+      pod,
+      { group: "", kind: "Service" },
+      lookupOf([web, headless, otherNs]),
+    );
+    expect(r.items.map((i) => i.type === "resource" && `${i.resource.namespace}/${i.resource.name}`)).toEqual([
+      "a/web",
+    ]);
+  });
+
+  test("reverseFieldRef finds the node a pod runs on", () => {
+    const pod = res(kinds.pod, "web-1", { spec: { nodeName: "n2" } }, "a");
+    const r = rel({
+      type: "reverseFieldRef",
+      group: "",
+      kind: "Pod",
+      items: "$.spec.nodeName",
+      match: { name: "${name}" },
+      allNamespaces: true,
+    }).inverse(pod, { group: "", kind: "Node" }, lookupOf([res(nodeKind, "n1"), res(nodeKind, "n2")]));
+    expect(names(r.items)).toEqual(["n2"]);
+    expect(r.demands).toEqual([{ group: "", kind: "Node", namespace: undefined }]);
+  });
+
+  test("fieldRef finds routes referencing a service, across namespaces only when asked", () => {
+    const svc = res(kinds.service, "web", {}, "app");
+    const sameNs = res(kinds.httpRoute, "r1", { spec: { rules: [{ backendRefs: [{ name: "web" }] }] } }, "app");
+    const crossNs = res(
+      kinds.httpRoute,
+      "r2",
+      { spec: { rules: [{ backendRefs: [{ name: "web", namespace: "app" }] }] } },
+      "edge",
+    );
+    const unrelated = res(kinds.httpRoute, "r3", { spec: { rules: [{ backendRefs: [{ name: "api" }] }] } }, "app");
+    const relation = rel({
+      type: "fieldRef",
+      items: "$.spec.rules[*].backendRefs[*]",
+      group: { path: "$.group", default: "" },
+      kind: { path: "$.kind", default: "Service" },
+      namespace: "$.namespace",
+    });
+    const lookup = lookupOf([sameNs, crossNs, unrelated]);
+    const parent = { group: "gateway.networking.k8s.io", kind: "HTTPRoute" };
+    expect(names(relation.inverse(svc, parent, lookup).items)).toEqual(["r1"]);
+    expect(names(relation.inverse(svc, parent, lookup, true).items)).toEqual(["r1", "r2"]);
+  });
+
+  test("field relations have no parents", () => {
+    const r = rel({ type: "field", items: "$.spec.containers[*]", label: "${$.name}" }).inverse(
+      res(kinds.pod, "p"),
+      { group: "", kind: "Pod" },
+      lookupOf([]),
+    );
+    expect(r).toEqual({ items: [], demands: [], pending: false });
+  });
+
+  test("pending when the parent kind is not loaded", () => {
+    const r = rel({ type: "labelSelector", kind: "Pod", selector: "$.spec.selector" }).inverse(
+      res(kinds.pod, "p"),
+      { group: "", kind: "Service" },
+      lookupOf([], false),
+    );
+    expect(r.pending).toBe(true);
+  });
+});
+
+test("apiGroup", () => {
+  expect(apiGroup("apps/v1")).toBe("apps");
+  expect(apiGroup("v1")).toBe("");
 });

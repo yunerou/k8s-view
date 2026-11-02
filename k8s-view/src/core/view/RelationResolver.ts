@@ -19,6 +19,17 @@ export interface KindDemand {
   readonly namespace: string | undefined;
 }
 
+export interface KindKey {
+  readonly group: string;
+  readonly kind: string;
+}
+
+/** API group of an `apiVersion` (`apps/v1` → `apps`, `v1` → core ``). */
+export function apiGroup(apiVersion: string): string {
+  const i = apiVersion.indexOf("/");
+  return i < 0 ? "" : apiVersion.slice(0, i);
+}
+
 export type ChildItem =
   | { readonly type: "resource"; readonly resource: KubeResource }
   | {
@@ -125,26 +136,102 @@ export class CompiledRelation {
     }
   }
 
+  /**
+   * Parents of `child` of kind `parent` under this relation (the reverse of `resolve`). `allNamespaces` also finds
+   * fieldRef parents in other namespaces (HTTPRoute `backendRefs[].namespace`).
+   */
+  inverse(child: KubeResource, parent: KindKey, lookup: ResourceLookup, allNamespaces = false): Resolution {
+    const c = this.config;
+    const demandIn = (namespace: string | undefined): KindDemand[] => [
+      { group: parent.group, kind: parent.kind, namespace },
+    ];
+    switch (c.type) {
+      case "field":
+        return { items: [], demands: [], pending: false };
+      case "ownerRef": {
+        const uids = child.owners
+          .filter((o) => o.kind === parent.kind && apiGroup(o.apiVersion) === parent.group)
+          .map((o) => o.uid);
+        const found = lookup.list(parent.group, parent.kind, child.namespace)?.filter((r) => uids.includes(r.uid));
+        return toResolution(found, demandIn(child.namespace));
+      }
+      case "labelSelector": {
+        const found = lookup
+          .list(parent.group, parent.kind, child.namespace)
+          ?.filter((p) => matchesSelector(this.selector!.first(p.object), child.labels));
+        return toResolution(found, demandIn(child.namespace));
+      }
+      case "reverseFieldRef": {
+        const ns = c.allNamespaces || allNamespaces ? undefined : child.namespace;
+        const found = lookup.list(parent.group, parent.kind, ns)?.filter((p) => {
+          const { name, ns: matchNs } = this.matchOf(p);
+          return this.refersTo(child, name, matchNs);
+        });
+        return toResolution(found, demandIn(ns));
+      }
+      case "fieldRef": {
+        const ns = allNamespaces ? undefined : child.namespace;
+        const found = lookup
+          .list(parent.group, parent.kind, ns)
+          ?.filter((p) =>
+            this.targetsOf(c, p).some(
+              (t) =>
+                t.group === child.kind.group &&
+                t.kind === child.kind.kind &&
+                t.name === child.name &&
+                (!child.kind.namespaced || t.namespace === child.namespace),
+            ),
+          );
+        return toResolution(found, demandIn(ns));
+      }
+    }
+  }
+
+  /** `child` lists a parent whose rendered match name/namespace are `name`/`ns` (Pod `$.spec.nodeName` → Node). */
+  private refersTo(child: KubeResource, name: string, ns: string | undefined): boolean {
+    return this.items!.all(child.object).some((ref) => {
+      // String entry = parent name (e.g. Pod `$.spec.nodeName` → Node).
+      if (typeof ref === "string") return ref === name && ns === undefined;
+      if (!ref || typeof ref !== "object") return false;
+      const r = ref as { name?: unknown; namespace?: unknown };
+      if (r.name !== name) return false;
+      return ns === undefined || (r.namespace ?? child.namespace) === ns;
+    });
+  }
+
+  private matchOf(parent: KubeResource): { name: string; ns: string | undefined } {
+    const ctx = { root: parent.object, variable: (n: string, a?: string) => resourceVariable(parent, n, a) };
+    return { name: this.matchName!.render(ctx), ns: this.matchNamespace?.render(ctx) };
+  }
+
+  /** Targets of a fieldRef relation on `parent`; namespace defaults to the parent's. */
+  private targetsOf(
+    c: Extract<RelationConfig, { type: "fieldRef" }>,
+    parent: KubeResource,
+  ): { group: string; kind: string; name: string; namespace: string | undefined }[] {
+    const out: { group: string; kind: string; name: string; namespace: string | undefined }[] = [];
+    for (const ref of this.items!.all(parent.object)) {
+      if (!ref || typeof ref !== "object") continue;
+      const name = asString(this.refName!.first(ref));
+      if (!name) continue;
+      out.push({
+        group: toGroup(this.refGroup?.first(ref), c.group.default),
+        kind: asString(this.refKind?.first(ref)) ?? c.kind.default,
+        name,
+        namespace: asString(this.refNamespace?.first(ref)) ?? parent.namespace,
+      });
+    }
+    return out;
+  }
+
   private resolveReverse(
     c: Extract<RelationConfig, { type: "reverseFieldRef" }>,
     parent: KubeResource,
     lookup: ResourceLookup,
   ): Resolution {
     const namespace = c.allNamespaces ? undefined : parent.namespace;
-    const ctx = { root: parent.object, variable: (n: string, a?: string) => resourceVariable(parent, n, a) };
-    const name = this.matchName!.render(ctx);
-    const ns = this.matchNamespace?.render(ctx);
-    const candidates = lookup.list(c.group, c.kind, namespace);
-    const found = candidates?.filter((child) =>
-      this.items!.all(child.object).some((ref) => {
-        // String entry = parent name (e.g. Pod `$.spec.nodeName` → Node).
-        if (typeof ref === "string") return ref === name && ns === undefined;
-        if (!ref || typeof ref !== "object") return false;
-        const r = ref as { name?: unknown; namespace?: unknown };
-        if (r.name !== name) return false;
-        return ns === undefined || (r.namespace ?? child.namespace) === ns;
-      }),
-    );
+    const { name, ns } = this.matchOf(parent);
+    const found = lookup.list(c.group, c.kind, namespace)?.filter((child) => this.refersTo(child, name, ns));
     return toResolution(found, [{ group: c.group, kind: c.kind, namespace }]);
   }
 
@@ -156,13 +243,7 @@ export class CompiledRelation {
     const items: ChildItem[] = [];
     const demands: KindDemand[] = [];
     let pending = false;
-    for (const ref of this.items!.all(parent.object)) {
-      if (!ref || typeof ref !== "object") continue;
-      const group = toGroup(this.refGroup?.first(ref), c.group.default);
-      const kind = asString(this.refKind?.first(ref)) ?? c.kind.default;
-      const name = asString(this.refName!.first(ref));
-      if (!name) continue;
-      const namespace = asString(this.refNamespace?.first(ref)) ?? parent.namespace;
+    for (const { group, kind, name, namespace } of this.targetsOf(c, parent)) {
       if (!demands.some((d) => d.group === group && d.kind === kind && d.namespace === namespace))
         demands.push({ group, kind, namespace });
       const candidates = lookup.list(group, kind, namespace);
