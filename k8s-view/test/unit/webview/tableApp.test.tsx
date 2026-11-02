@@ -163,6 +163,44 @@ describe("TableApp", () => {
     expect(await screen.findByRole("columnheader", { name: /Namespace/ })).toBeTruthy();
   });
 
+  const openRow = (uid: string) => {
+    const cell = within(screen.getAllByRole("row").find((r) => r.getAttribute("data-uid") === uid)!).getAllByRole(
+      "gridcell",
+    )[2]!;
+    act(() => cell.focus());
+    fireEvent.keyDown(cell, { key: "Enter" });
+  };
+
+  test("the drawer keeps its tab when another row is opened", async () => {
+    render(<TableApp />);
+    await screen.findByRole("tab", { name: /Deployments/ });
+    openRow("a");
+    let drawer = await screen.findByRole("complementary", { name: /Details of Deployment default\/a/ });
+    fireEvent.click(within(drawer).getByRole("tab", { name: /Events/ }));
+    openRow("b");
+    drawer = await screen.findByRole("complementary", { name: /Details of Deployment default\/b/ });
+    expect(
+      within(drawer)
+        .getByRole("tab", { name: /Events/ })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(await within(drawer).findByText("BackOff")).toBeTruthy();
+    await waitFor(() =>
+      expect(messengerModule.setWebviewState).toHaveBeenLastCalledWith(
+        expect.objectContaining({ drawerTab: "events" }),
+      ),
+    );
+  });
+
+  test("restores the drawer tab from webview state", async () => {
+    setInitialState({ viewId: "workload", prefs: {}, drawerTab: "yaml" } satisfies TableWebviewState);
+    render(<TableApp />);
+    await screen.findByRole("tab", { name: /Deployments/ });
+    openRow("a");
+    const drawer = await screen.findByRole("complementary", { name: /Details of Deployment default\/a/ });
+    expect(within(drawer).getByRole("tab", { name: "YAML" }).getAttribute("aria-selected")).toBe("true");
+  });
+
   test("right-click opens the context menu for the row", async () => {
     render(<TableApp />);
     await screen.findByRole("tab", { name: /Deployments/ });

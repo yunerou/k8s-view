@@ -9,7 +9,12 @@ import { RelatedTree } from "./RelatedTree";
 import { StatusDot } from "./StatusDot";
 import { Tabs } from "./Tabs";
 
-type DetailTab = "overview" | "yaml" | "events" | "conditions" | "related";
+export type DetailTab = "overview" | "yaml" | "events" | "conditions" | "related";
+const DETAIL_TABS: readonly string[] = ["overview", "yaml", "events", "conditions", "related"];
+
+export function isDetailTab(v: unknown): v is DetailTab {
+  return typeof v === "string" && DETAIL_TABS.includes(v);
+}
 
 const MIN_WIDTH = 280;
 const DEFAULT_WIDTH = 600;
@@ -19,6 +24,12 @@ export interface DetailDrawerProps {
   readonly uid: string;
   readonly title: string;
   readonly onClose: () => void;
+  /** Controlled tab (TableApp keeps it across records); internal state when omitted. */
+  readonly tab?: DetailTab | undefined;
+  readonly onTabChange?: ((tab: DetailTab) => void) | undefined;
+  /** Controlled width in pixels; internal state when omitted. */
+  readonly width?: number | undefined;
+  readonly onWidthChange?: ((width: number) => void) | undefined;
 }
 
 function age(iso: string | undefined, now: number): string {
@@ -31,12 +42,22 @@ function conditionLevel(status: string): StatusLevel {
 }
 
 /** Right-hand detail drawer: Overview / YAML / Events / Conditions / Related. */
-export function DetailDrawer({ sectionId, uid, title, onClose }: DetailDrawerProps) {
+export function DetailDrawer({ sectionId, uid, title, onClose, ...controlled }: DetailDrawerProps) {
   const [details, setDetails] = useState<RowDetails>();
   const [error, setError] = useState<string>();
-  const [tab, setTab] = useState<DetailTab>("overview");
+  const [ownTab, setOwnTab] = useState<DetailTab>("overview");
+  const tab = controlled.tab ?? ownTab;
+  const setTab = (t: DetailTab) => {
+    setOwnTab(t);
+    controlled.onTabChange?.(t);
+  };
   // Narrow windows: initially use at most 60% of the width (still resizable up to 85%).
-  const [width, setWidth] = useState(() => Math.max(MIN_WIDTH, Math.min(DEFAULT_WIDTH, window.innerWidth * 0.6)));
+  const [ownWidth, setOwnWidth] = useState(() => Math.max(MIN_WIDTH, Math.min(DEFAULT_WIDTH, window.innerWidth * 0.6)));
+  const width = controlled.width ?? ownWidth;
+  const setWidth = (w: number) => {
+    setOwnWidth(w);
+    controlled.onWidthChange?.(w);
+  };
   const [reload, setReload] = useState(0);
   const now = useNow(30_000);
 
@@ -76,8 +97,8 @@ export function DetailDrawer({ sectionId, uid, title, onClose }: DetailDrawerPro
   };
   const onResizeKey = (e: KeyboardEvent<HTMLDivElement>) => {
     const step = e.shiftKey ? 64 : 16;
-    if (e.key === "ArrowLeft") setWidth((w) => Math.min(maxWidth(), w + step));
-    else if (e.key === "ArrowRight") setWidth((w) => Math.max(MIN_WIDTH, w - step));
+    if (e.key === "ArrowLeft") setWidth(Math.min(maxWidth(), width + step));
+    else if (e.key === "ArrowRight") setWidth(Math.max(MIN_WIDTH, width - step));
     else return;
     e.preventDefault();
   };

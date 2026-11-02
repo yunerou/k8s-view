@@ -277,6 +277,8 @@ export const TableNotifications = {
 export interface TableWebviewState {
   readonly viewId: string;
   readonly activeSection?: string;
+  /** Detail drawer tab, kept across records and reloads. */
+  readonly drawerTab?: string;
   readonly prefs?: Readonly<Record<string, SectionPrefs>>;
 }
 

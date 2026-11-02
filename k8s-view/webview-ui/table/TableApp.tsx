@@ -12,7 +12,7 @@ import {
 import { Banner } from "../components/Banner";
 import { Codicon } from "../components/Codicon";
 import { ContextMenu } from "../components/ContextMenu";
-import { DetailDrawer } from "../components/DetailDrawer";
+import { DetailDrawer, type DetailTab, isDetailTab } from "../components/DetailDrawer";
 import { HotkeyHelp } from "../components/HotkeyHelp";
 import { type GridHandle, ResourceGrid } from "../components/ResourceGrid";
 import { SectionToolbar } from "../components/SectionToolbar";
@@ -56,6 +56,9 @@ export function TableApp() {
   const [drawer, setDrawer] = useState<DrawerState>();
   const [hotkeys, setHotkeys] = useState<HotkeyState>();
   const [showHelp, setShowHelp] = useState(false);
+  const savedTab = saved?.drawerTab;
+  const [drawerTab, setDrawerTab] = useState<DetailTab>(isDetailTab(savedTab) ? savedTab : "overview");
+  const [drawerWidth, setDrawerWidth] = useState<number>();
   const grid = useRef<GridHandle>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const viewId = useRef(saved?.viewId);
@@ -114,8 +117,9 @@ export function TableApp() {
       viewId: model.viewId,
       prefs,
       ...(activeId === undefined ? {} : { activeSection: activeId }),
+      ...(drawerTab === "overview" ? {} : { drawerTab }),
     });
-  }, [model?.viewId, activeId, prefs, model]);
+  }, [model?.viewId, activeId, prefs, model, drawerTab]);
 
   const savePrefs = useDebounced((sectionId: string, p: SectionPrefs) => {
     request(TableRequests.savePrefs, { sectionId, prefs: p }).catch(report);
@@ -295,6 +299,10 @@ export function TableApp() {
                   : drawer.uid
               }
               onClose={() => setDrawer(undefined)}
+              tab={drawerTab}
+              onTabChange={setDrawerTab}
+              width={drawerWidth}
+              onWidthChange={setDrawerWidth}
             />
           )}
         </div>
