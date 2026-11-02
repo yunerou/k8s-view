@@ -82,6 +82,11 @@ describe("ResourceGrid", () => {
     expect(onPrefs).toHaveBeenLastCalledWith({ sort: { id: "ready", desc: true } });
   });
 
+  test("groups by a column value", () => {
+    render(<Harness section={section("deployments", rows)} prefs={{ groupBy: "column:phase" }} />);
+    expect(names()).toEqual(["#Running3", "a", "b", "c"]);
+  });
+
   test("groups rows with counts and collapses a group", () => {
     render(<Harness section={section("deployments", rows)} prefs={{ groupBy: "namespace" }} />);
     expect(names()).toEqual(["#team-a2", "a", "c", "#team-b1", "b"]);

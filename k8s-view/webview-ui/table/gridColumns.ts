@@ -231,7 +231,7 @@ export function buildColumns(
     ),
     {
       id: COL.group,
-      accessorFn: (r) => (groupBy ? groupKeyOf(r, groupBy, sectionGroupBy) : ""),
+      accessorFn: (r) => (groupBy ? groupKeyOf(r, groupBy, sectionGroupBy, columns) : ""),
       enableColumnFilter: false,
       enableGlobalFilter: false,
     },

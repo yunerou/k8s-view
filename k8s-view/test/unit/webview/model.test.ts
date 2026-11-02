@@ -12,7 +12,7 @@ import {
   moveColumn,
   withPref,
 } from "../../../webview-ui/table/model";
-import { model, row, section } from "./fixtures";
+import { columns, model, row, section } from "./fixtures";
 
 describe("applyPatch", () => {
   const base = model([section("deployments", [row("a"), row("b"), row("c")]), section("pods", [row("p1")])]);
@@ -115,6 +115,9 @@ describe("grouping helpers", () => {
       "namespace",
       "status",
       "kind",
+      "column:ready",
+      "column:phase",
+      "column:images",
       "label:app",
       "label:tier",
       "$.spec.x",
@@ -158,4 +161,16 @@ describe("column prefs", () => {
     });
     expect(withPref({ filter: "x" }, "filter", undefined)).toEqual({});
   });
+});
+
+test("groupKeyOf groups by a column's text", () => {
+  expect(groupKeyOf(row("a", { ready: 2 }), "column:ready", undefined, columns)).toBe("2/1");
+  expect(groupKeyOf(row("b", { ready: null }), "column:ready", undefined, columns)).toBe("(none)");
+  expect(groupKeyOf(row("a"), "column:missing", undefined, columns)).toBe("(none)");
+});
+
+test("groupByOptions offers discrete columns only", () => {
+  const values = groupByOptions(section("pods", [])).map((o) => o.value);
+  expect(values).toEqual(expect.arrayContaining(["column:ready", "column:phase", "column:images"]));
+  expect(values).not.toContain("column:age");
 });

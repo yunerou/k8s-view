@@ -1,5 +1,13 @@
 import * as l10n from "@vscode/l10n";
-import type { SectionPrefs, TablePatch, TableRow, TableSection, TableViewModel } from "../../src/shared/protocol";
+import type {
+  RenderKind,
+  SectionPrefs,
+  TableColumn,
+  TablePatch,
+  TableRow,
+  TableSection,
+  TableViewModel,
+} from "../../src/shared/protocol";
 
 /** `groupBy` value that disables grouping (unlike `undefined` = no preference, use the section default). */
 export const GROUP_NONE = "none";
@@ -44,12 +52,23 @@ export function effectiveGroupBy(section: TableSection, prefs: SectionPrefs): st
   return !g || g === GROUP_NONE ? undefined : g;
 }
 
-/** Same convention as `SectionDefinition.groupKey` in the extension. */
-export function groupKeyOf(row: TableRow, groupBy: string, sectionGroupBy: string | undefined): string {
+const CONTINUOUS = new Set<RenderKind>(["age", "cpu", "memory", "percentage"]);
+
+/** Same convention as `SectionDefinition.groupKey` in the extension, plus `column:<id>` (cell text). */
+export function groupKeyOf(
+  row: TableRow,
+  groupBy: string,
+  sectionGroupBy: string | undefined,
+  columns: readonly TableColumn[] = [],
+): string {
   if (groupBy === "kind") return row.kind;
   if (groupBy === "namespace") return row.namespace ?? "(cluster)";
   if (groupBy === "status") return row.level;
   if (groupBy.startsWith("label:")) return row.labels[groupBy.slice(6)] ?? "(none)";
+  if (groupBy.startsWith("column:")) {
+    const i = columns.findIndex((c) => c.id === groupBy.slice(7));
+    return (i < 0 ? undefined : row.cells[i]?.text) || "(none)";
+  }
   return (groupBy === sectionGroupBy ? row.groupKey : undefined) ?? "(none)";
 }
 
@@ -65,6 +84,9 @@ export function groupByOptions(section: TableSection): GroupByOption[] {
     { value: "status", label: l10n.t("Status") },
     { value: "kind", label: l10n.t("Kind") },
   ];
+  for (const c of section.columns) {
+    if (!CONTINUOUS.has(c.render)) options.push({ value: `column:${c.id}`, label: l10n.t("Column: {0}", c.title) });
+  }
   const keys = new Set<string>();
   for (const r of section.rows) for (const k of Object.keys(r.labels)) keys.add(k);
   for (const k of [...keys].sort()) options.push({ value: `label:${k}`, label: l10n.t("Label: {0}", k) });
