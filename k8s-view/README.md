@@ -35,11 +35,16 @@ such as `aws`, `kubelogin` or `gke-gcloud-auth-plugin`, that plugin must be avai
 Use the sidebar to navigate relationships, or open the same view as a table when you want to compare resources.
 
 - **Filter by name**, sort by a column, or turn on **column filters** to narrow the list further.
-- **Group rows** by kind, namespace, status or a resource label.
+- **Group rows** by kind, namespace, status, a resource label or any column (for example Pods by Node).
 - **Choose your columns:** hide, reorder and resize them; use **Save to config** to keep the layout in a view definition.
 - **See health at a glance:** readiness counts, status colors, and highlighted warning or error rows.
 - **Check CPU and memory** in the Pods and Node tables. Usage requires the cluster's metrics API and permission
   to read it; unavailable values appear as `-`.
+
+Column filters understand expressions: `>0`, `<1h`, `>100%`, `>500m`, `>1Gi`, `!=Running` or `a|b`. Type them in the
+filter row, or in the search box as `restarts:>0 age:<1h`. Right-click a resource and choose **Open Related** or
+**Open Parent** to open a table tab limited to its related or parent resources, kept up to date live. The chip at the
+top of that tab turns the limit off.
 
 Select **Live** for watch updates, choose **3s / 5s / 10s** polling, or **Pause** while you investigate.
 
@@ -54,6 +59,7 @@ Double-click a table row to open its details alongside the list:
 | **Events** | Events associated with the resource |
 | **Conditions** | Status, reasons and messages reported by Kubernetes or a controller |
 | **Related** | Expand related resources, such as a Deployment's ReplicaSets and their Pods |
+| **Parent** | Owners and other resources that point at this one, such as selecting Services, Nodes or routes |
 
 ![Inspect workload conditions and expand related ReplicaSets and Pods](https://raw.githubusercontent.com/yunerou/k8s-view/main/k8s-view/resources/demos/resource-details.gif)
 

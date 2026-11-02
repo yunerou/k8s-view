@@ -9,6 +9,10 @@ even minor versions (0.2.x) are stable.
 ### Added
 
 - Official Kubernetes documentation links in the detail drawer Overview for common built-in resource kinds.
+- Table: column filter expressions (`>0`, `<1h`, `>100%`, `>500m`, `>1Gi`, `!=Running`, `a|b`) in the filter row and as `column:expr` qualifiers in the search box; column filters are remembered per section.
+- Table: group by any column (e.g. Pods by Node).
+- Details: the drawer keeps the selected tab when another row is opened; new Parent tab (owners, selecting Services, Nodes, referencing routes...).
+- Commands: Open Related / Open Parent open a table tab limited to a resource's related or parent resources, updated live.
 
 ### Fixed
 
