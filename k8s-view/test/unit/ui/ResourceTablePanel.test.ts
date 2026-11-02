@@ -4,10 +4,11 @@ import type { CommandExecutor } from "../../../src/app/CommandExecutor";
 import { CommandRegistry } from "../../../src/app/CommandRegistry";
 import { ContextService } from "../../../src/app/ContextService";
 import { HotkeyService } from "../../../src/app/HotkeyService";
+import { ScopedViewService } from "../../../src/app/ScopedViewService";
 import { ViewRegistry } from "../../../src/app/ViewRegistry";
 import { ViewSessionManager } from "../../../src/app/ViewSessionManager";
 import { parseConfigText } from "../../../src/core/config/parseConfig";
-import type { CommandItem, RelatedGroup, RowDetails } from "../../../src/shared/protocol";
+import type { CommandItem, RelatedGroup, RowDetails, TableViewModel } from "../../../src/shared/protocol";
 import type { ConfigWriter } from "../../../src/ui/ConfigWriter";
 import type { ManifestDocumentProvider } from "../../../src/ui/ManifestDocumentProvider";
 import { ResourceTablePanels } from "../../../src/ui/webview/ResourceTablePanel";
@@ -15,11 +16,12 @@ import { FakeResourceSource } from "../helpers/FakeResourceSource";
 import { FakeClusterApi, FakeKubeConfig, FakeSettings, FakeState } from "../helpers/fakes";
 import { kinds, res } from "../helpers/fixtures";
 
-const { handlers, notifications, pick, openExternal } = vi.hoisted(() => ({
+const { handlers, notifications, pick, openExternal, info } = vi.hoisted(() => ({
   handlers: new Map<string, (params?: unknown) => unknown>(),
   notifications: [] as string[],
   pick: vi.fn(),
   openExternal: vi.fn(async () => true),
+  info: vi.fn(),
 }));
 let panel: vscode.WebviewPanel;
 vi.mock("vscode", async (original) => ({
@@ -27,7 +29,7 @@ vi.mock("vscode", async (original) => ({
   env: { openExternal },
   ViewColumn: { Active: -1 },
   QuickPickItemKind: { Separator: -1, Default: 0 },
-  window: { createWebviewPanel: () => panel, showQuickPick: pick },
+  window: { createWebviewPanel: () => panel, showQuickPick: pick, showInformationMessage: info },
 }));
 vi.mock("vscode-messenger", () => ({
   Messenger: class {
@@ -48,6 +50,10 @@ let tables: ResourceTablePanels;
 let sessions: ViewSessionManager;
 let contexts: ContextService;
 let source: FakeResourceSource;
+let registry: ViewRegistry;
+let state: FakeState;
+let scoped: ScopedViewService;
+let manifestsOpen: ReturnType<typeof vi.fn>;
 const execute = vi.fn(async () => "ok" as const);
 const deployment = res(kinds.deployment, "web", {}, "a");
 const second = res(kinds.deployment, "api", {}, "a");
@@ -64,7 +70,7 @@ beforeEach(async () => {
   execute.mockClear();
   pick.mockReset();
   openExternal.mockClear();
-  const state = new FakeState();
+  state = new FakeState();
   const settings = new FakeSettings();
   contexts = new ContextService(
     new FakeKubeConfig([{ name: "dev", cluster: "dev", user: "u", namespace: "a" }], "dev"),
@@ -76,7 +82,7 @@ beforeEach(async () => {
   source = new FakeResourceSource();
   source.addKind(kinds.deployment, kinds.pod);
   source.set({ group: "apps", kind: "Deployment" }, "a", [deployment, second]);
-  const registry = new ViewRegistry();
+  registry = new ViewRegistry();
   const commands = new CommandRegistry();
   const config = parseConfigText(
     JSON.stringify({
@@ -146,11 +152,13 @@ beforeEach(async () => {
     active: true,
     title: "Table",
     reveal() {},
-    dispose() {},
+    dispose: vi.fn(),
     webview: { html: "", cspSource: "test", asWebviewUri: (uri: vscode.Uri) => uri },
     onDidChangeViewState: new vscode.EventEmitter<vscode.WebviewPanelOnDidChangeViewStateEvent>().event,
     onDidDispose: new vscode.EventEmitter<void>().event,
   } as unknown as vscode.WebviewPanel;
+  scoped = new ScopedViewService(registry, contexts, source);
+  manifestsOpen = vi.fn(async () => undefined);
   tables = new ResourceTablePanels(
     { extensionUri: vscode.Uri.file("/extension") } as vscode.ExtensionContext,
     sessions,
@@ -161,8 +169,9 @@ beforeEach(async () => {
     source,
     state,
     {} as ConfigWriter,
-    {} as ManifestDocumentProvider,
+    { open: manifestsOpen } as unknown as ManifestDocumentProvider,
     new HotkeyService(state, settings, registry),
+    scoped,
   );
   tables.open("workload");
   await request("getViewModel");
@@ -289,5 +298,110 @@ describe("table commands and related tree", () => {
     ]);
     const up = await request<RelatedGroup[]>("parents", { key: `table:parents:${pod.uid}/${rs.uid}` });
     expect(up.map((g) => [g.title, g.items.map((i) => i.name)])).toEqual([["Deployment", ["web"]]]);
+  });
+});
+
+describe("scoped tabs", () => {
+  const ownedPod = () =>
+    res(
+      kinds.pod,
+      "web-x",
+      {
+        metadata: {
+          name: "web-x",
+          uid: "pod-web-x",
+          ownerReferences: [{ apiVersion: "apps/v1", kind: "Deployment", name: "web", uid: deployment.uid }],
+        },
+      },
+      "a",
+    );
+
+  async function openRelated() {
+    const pod = ownedPod();
+    source.set({ group: "", kind: "Pod" }, "a", [pod, res(kinds.pod, "api-x", {}, "a")]);
+    expect(await request("openScoped", { sectionId: "deployments", uid: deployment.uid, direction: "related" })).toBe(
+      true,
+    );
+    await sessions.session(`related.${deployment.uid}`)!.whenReady();
+    return { pod, vm: await request<TableViewModel>("getViewModel") };
+  }
+
+  test("Open Related opens a tab limited to the source's pods", async () => {
+    const { vm } = await openRelated();
+    expect(vm.viewId).toBe(`related.${deployment.uid}`);
+    expect(vm.title).toBe("Related · Deployment a/web");
+    expect(vm.sections.map((s) => [s.id, s.rows.map((r) => r.name)])).toEqual([["pod", ["web-x"]]]);
+    expect(vm.scope).toEqual({
+      direction: "related",
+      context: "dev",
+      source: { group: "apps", kind: "Deployment", namespace: "a", name: "web", uid: deployment.uid },
+      enabled: true,
+      sourceMissing: false,
+    });
+  });
+
+  test("reveals the existing tab instead of registering it again", async () => {
+    await openRelated();
+    const view = sessions.session(`related.${deployment.uid}`)!.view;
+    expect(
+      tables.openScoped("related", {
+        group: "apps",
+        kind: "Deployment",
+        namespace: "a",
+        name: "web",
+        uid: deployment.uid,
+      }),
+    ).toBe(true);
+    expect(sessions.session(`related.${deployment.uid}`)!.view).toBe(view);
+  });
+
+  test("turning the scope off shows every pod; the source opens as a manifest", async () => {
+    await openRelated();
+    await request("setScopeEnabled", { enabled: false });
+    const vm = await request<TableViewModel>("getViewModel");
+    expect(vm.sections[0]!.rows.map((r) => r.name).sort()).toEqual(["api-x", "web-x"]);
+    expect(vm.scope?.enabled).toBe(false);
+    await request("openScopeSource");
+    expect(manifestsOpen).toHaveBeenCalledWith({
+      context: "dev",
+      group: "apps",
+      kind: "Deployment",
+      namespace: "a",
+      name: "web",
+    });
+  });
+
+  test("scoped tabs share preferences per direction", async () => {
+    await openRelated();
+    await request("savePrefs", { sectionId: "pod", prefs: { filter: "x" } });
+    expect(state.getWorkspace("k8sView.tablePrefs/scoped:related")).toEqual({ pod: { filter: "x" } });
+  });
+
+  test("kinds without relations show a message instead of a tab", async () => {
+    expect(tables.openScoped("related", { group: "", kind: "ConfigMap", namespace: "a", name: "cm", uid: "cm1" })).toBe(
+      false,
+    );
+    expect(info).toHaveBeenCalled();
+  });
+
+  test("context change closes scoped tabs", async () => {
+    await openRelated();
+    scoped.clear();
+    expect(panel.dispose).toHaveBeenCalled();
+  });
+
+  test("restores a scoped tab from webview state only in its context", async () => {
+    const pod = ownedPod();
+    source.set({ group: "", kind: "Pod" }, "a", [pod]);
+    const scopeRef = {
+      direction: "related" as const,
+      context: "dev",
+      source: { group: "apps", kind: "Deployment", namespace: "a", name: "web", uid: deployment.uid },
+    };
+    await tables.deserializeWebviewPanel(panel, { viewId: `related.${deployment.uid}`, scope: scopeRef });
+    expect(sessions.session(`related.${deployment.uid}`)).toBeDefined();
+    const other = { ...panel, dispose: vi.fn() } as unknown as vscode.WebviewPanel;
+    await tables.deserializeWebviewPanel(other, { viewId: "related.x", scope: { ...scopeRef, context: "prod" } });
+    expect(other.dispose).toHaveBeenCalled();
   });
 });

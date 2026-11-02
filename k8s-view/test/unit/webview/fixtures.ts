@@ -69,7 +69,7 @@ export function model(sections: TableSection[], extra: Partial<TableViewModel> =
     viewId: "workload",
     title: "Workload",
     context: "kind-dev",
-    scope: { type: "all" },
+    namespaceScope: { type: "all" },
     sections,
     prefs: {},
     hotkeys: { enabled: false, bindings: [], favorites: [] },

@@ -36,6 +36,7 @@ import { HotkeyService } from "./HotkeyService";
 import { KindViewService } from "./KindViewService";
 import { ResourceSource } from "./ports/ResourceSource";
 import { Settings } from "./ports/Settings";
+import { ScopedViewService } from "./ScopedViewService";
 import { ViewRegistry } from "./ViewRegistry";
 import { ViewSessionManager } from "./ViewSessionManager";
 
@@ -56,6 +57,7 @@ export class ExtensionApp {
     private readonly settings = inject(Settings),
     private readonly views = inject(ViewRegistry),
     private readonly sessions = inject(ViewSessionManager),
+    private readonly scopedViews = inject(ScopedViewService),
     private readonly commands = inject(CommandRegistry),
     private readonly executor = inject(CommandExecutor),
     private readonly trees = inject(TreeViewManager),
@@ -92,6 +94,7 @@ export class ExtensionApp {
       this.views,
       this.commands,
       this.sessions,
+      this.scopedViews,
       this.watches,
       this.trees,
       this.statusBar,

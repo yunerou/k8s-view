@@ -217,7 +217,7 @@ export function TableApp() {
       <header className="view-header">
         <h1>{model.title}</h1>
         <span className="muted">
-          {[model.context ?? l10n.t("No context"), scopeLabel(model.scope)].filter(Boolean).join(" · ")}
+          {[model.context ?? l10n.t("No context"), scopeLabel(model.namespaceScope)].filter(Boolean).join(" · ")}
         </span>
         {hotkeys?.enabled && (
           <button

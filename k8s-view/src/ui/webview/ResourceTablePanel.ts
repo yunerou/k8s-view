@@ -9,6 +9,7 @@ import { HotkeyService } from "../../app/HotkeyService";
 import { ResourceSource } from "../../app/ports/ResourceSource";
 import { Settings } from "../../app/ports/Settings";
 import { StateStore } from "../../app/ports/StateStore";
+import { ScopedViewService } from "../../app/ScopedViewService";
 import { buildSection, diffSection, EMPTY_SNAPSHOT, type SectionSnapshot } from "../../app/TableModel";
 import type { ViewSession } from "../../app/ViewSession";
 import { ViewSessionManager } from "../../app/ViewSessionManager";
@@ -16,10 +17,12 @@ import { formatAge } from "../../core/resource/format";
 import type { KubeResource } from "../../core/resource/KubeResource";
 import { resourceDocumentation } from "../../core/resource/resourceDocumentation";
 import type { ParentVia } from "../../core/view/ParentIndex";
+import { type ScopeDirection, type ScopeSource, scopeSourceOf, type ViewScope } from "../../core/view/ScopeResolver";
+import { scopedDirection } from "../../core/view/scopedView";
 import type { ChildDefinition } from "../../core/view/ViewDefinition";
 import { EXTENSION_CONTEXT } from "../../di/tokens";
 import type { HotkeyAction } from "../../shared/hotkeys";
-import type { RelatedGroup, RelatedItem } from "../../shared/protocol";
+import type { RelatedGroup, RelatedItem, ScopeRef } from "../../shared/protocol";
 import {
   type CommandItem,
   type RowDetails,
@@ -42,7 +45,26 @@ const VIA_LABEL: Record<ParentVia, string> = {
   referencedBy: "referenced by this",
 };
 
-const prefsKey = (viewId: string) => `k8sView.tablePrefs/${viewId}`;
+/** Scoped tabs (Open Related/Parent) share one layout per direction instead of one per source UID. */
+const prefsKey = (viewId: string) => {
+  const direction = scopedDirection(viewId);
+  return `k8sView.tablePrefs/${direction ? `scoped:${direction}` : viewId}`;
+};
+
+function toScopeRef(scope: ViewScope): ScopeRef {
+  const s = scope.source;
+  return {
+    direction: scope.direction,
+    context: scope.context,
+    source: {
+      group: s.group,
+      kind: s.kind,
+      ...(s.namespace ? { namespace: s.namespace } : {}),
+      name: s.name,
+      uid: s.uid,
+    },
+  };
+}
 
 /** Manage table tabs (one per view) and restore them after reload. */
 @injectable()
@@ -64,6 +86,7 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
     private readonly writer = inject(ConfigWriter),
     private readonly manifests = inject(ManifestDocumentProvider),
     private readonly hotkeys = inject(HotkeyService),
+    private readonly scoped = inject(ScopedViewService),
   ) {}
 
   /** A table tab is active. */
@@ -94,7 +117,36 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
     this.attach(panel, viewId);
   }
 
+  /** Open Related / Open Parent tab for `source`; reveals the tab when it is already open. */
+  openScoped(direction: ScopeDirection, source: ScopeSource, children?: readonly ChildDefinition[]): boolean {
+    const viewId = this.scoped.ensure(direction, source, children);
+    if (!viewId) {
+      void vscode.window.showInformationMessage(
+        direction === "related"
+          ? vscode.l10n.t("No related resources configured for {0}.", source.kind)
+          : vscode.l10n.t("No parent relations for {0}.", source.kind),
+      );
+      return false;
+    }
+    this.open(viewId);
+    return true;
+  }
+
   async deserializeWebviewPanel(panel: vscode.WebviewPanel, state: TableWebviewState | undefined): Promise<void> {
+    if (state?.scope) {
+      const s = state.scope;
+      const viewId =
+        this.contexts.current?.name === s.context
+          ? this.scoped.ensure(s.direction, { ...s.source, namespace: s.source.namespace })
+          : undefined;
+      if (!viewId) {
+        panel.dispose();
+        return;
+      }
+      panel.webview.options = webviewOptions(this.extension.extensionUri);
+      this.attach(panel, viewId);
+      return;
+    }
     if (!state?.viewId || !this.sessions.session(state.viewId)) {
       panel.dispose();
       return;
@@ -111,6 +163,10 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
   /** View-switch hotkey: focus an existing tab for that view, or switch views within the current tab. */
   switchView(table: TablePanel, viewId: string): void {
     if (viewId === table.viewId) return;
+    if (scopedDirection(table.viewId)) {
+      this.open(viewId);
+      return;
+    }
     const existing = this.panels.get(viewId);
     if (existing) {
       existing.panel.reveal();
@@ -132,6 +188,7 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
     panel.onDidDispose(() => {
       table.dispose();
       if (this.panels.get(table.viewId) === table) this.panels.delete(table.viewId);
+      this.scoped.remove(table.viewId);
       this.activeChanged.fire();
     });
     this.activeChanged.fire();
@@ -150,6 +207,7 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
       writer: this.writer,
       manifests: this.manifests,
       hotkeys: this.hotkeys,
+      scoped: this.scoped,
     };
   }
 }
@@ -162,6 +220,7 @@ class TablePanel implements vscode.Disposable {
   private openSections = new Set<string>();
   private detailsKey: string | undefined;
   private parentsKey: string | undefined;
+  private scopeKey = "";
   private readonly parentNodes = new Map<string, KubeResource>();
   private readonly relatedNodes = new Map<string, { resource: KubeResource; children: readonly ChildDefinition[] }>();
   private dirty = false;
@@ -192,6 +251,25 @@ class TablePanel implements vscode.Disposable {
         const [resource] = this.resolve(ref.sectionId, [ref.uid]);
         const url = resource && resourceDocumentation(resource.kind);
         if (url) await vscode.env.openExternal(vscode.Uri.parse(url));
+      }),
+      m.onRequest(TableRequests.openScoped, ({ sectionId, uid, direction }) => {
+        const [r] = this.resolve(sectionId, [uid]);
+        if (!r) return false;
+        const children = direction === "related" ? this.session?.sectionDefinition(sectionId)?.children : undefined;
+        return this.owner.openScoped(direction, scopeSourceOf(r), children);
+      }),
+      m.onRequest(TableRequests.setScopeEnabled, ({ enabled }) => this.session?.setScopeEnabled(enabled)),
+      m.onRequest(TableRequests.openScopeSource, async () => {
+        const scope = this.session?.view.scope;
+        if (!scope) return;
+        const s = scope.source;
+        await d.manifests.open({
+          context: scope.context,
+          group: s.group,
+          kind: s.kind,
+          namespace: s.namespace,
+          name: s.name,
+        });
       }),
       m.onRequest(TableRequests.related, ({ key }) => this.related(key)),
       m.onRequest(TableRequests.parents, ({ key }) => this.parents(key)),
@@ -366,12 +444,16 @@ class TablePanel implements vscode.Disposable {
       this.resources.set(def.id, new Map(content.items.map((r) => [r.uid, r])));
       return built;
     });
+    const scope = session?.view.scope;
+    const scopeState = session?.scopeState();
+    this.scopeKey = JSON.stringify(scopeState ?? null);
     this.dirty = false;
     return {
       viewId: this.viewId,
       title: session?.definition.title ?? this.viewId,
       context: ctx?.name,
-      scope: ctx?.scope,
+      namespaceScope: ctx?.scope,
+      ...(scope && scopeState ? { scope: { ...toScopeRef(scope), ...scopeState } } : {}),
       sections,
       prefs: this.owner.deps.state.getWorkspace<Record<string, SectionPrefs>>(prefsKey(this.viewId)) ?? {},
       hotkeys: this.owner.deps.hotkeys.state(),
@@ -379,6 +461,11 @@ class TablePanel implements vscode.Disposable {
   }
 
   private reset(): void {
+    if (!this.session && scopedDirection(this.viewId)) {
+      // Scoped view removed (context changed): its tab has nothing left to show.
+      this.panel.dispose();
+      return;
+    }
     this.closeDetails();
     this.subscribeSession();
     const session = this.session;
@@ -415,6 +502,8 @@ class TablePanel implements vscode.Disposable {
       this.resources.set(def.id, new Map(content.items.map((r) => [r.uid, r])));
       if (changed) this.messenger.sendNotification(TableNotifications.patch, this.participant, patch);
     }
+    // Scope turned off/on or source deleted: banner and rows change together, so send a full model.
+    if (JSON.stringify(session.scopeState() ?? null) !== this.scopeKey) this.reset();
   }
 
   private resolve(sectionId: string, uids: readonly string[]): KubeResource[] {

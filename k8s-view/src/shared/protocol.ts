@@ -146,11 +146,34 @@ export interface SectionPrefs {
   readonly columnFilters?: Readonly<Record<string, string>>;
 }
 
+export type ScopeDirection = "related" | "parents";
+
+/** Source of an Open Related / Open Parent tab (also saved in webview state to restore the tab). */
+export interface ScopeRef {
+  readonly direction: ScopeDirection;
+  readonly context: string;
+  readonly source: {
+    readonly group: string;
+    readonly kind: string;
+    readonly namespace?: string;
+    readonly name: string;
+    readonly uid: string;
+  };
+}
+
+export interface TableScope extends ScopeRef {
+  /** `false`: the user turned the scope off; sections list every resource of their kind. */
+  readonly enabled: boolean;
+  readonly sourceMissing: boolean;
+}
+
 export interface TableViewModel {
   readonly viewId: string;
   readonly title: string;
   readonly context: string | undefined;
-  readonly scope: NamespaceScope | undefined;
+  readonly namespaceScope: NamespaceScope | undefined;
+  /** Present on Open Related / Open Parent tabs. */
+  readonly scope?: TableScope;
   readonly sections: readonly TableSection[];
   readonly prefs: Readonly<Record<string, SectionPrefs>>;
   readonly hotkeys: HotkeyState;
@@ -250,6 +273,11 @@ export const TableRequests = {
   related: { method: "table/related" } as RequestType<{ key: string }, readonly RelatedGroup[]>,
   /** Parents of a drawer node (`table:parents:<uid>` or one of its items). */
   parents: { method: "table/parents" } as RequestType<{ key: string }, readonly RelatedGroup[]>,
+  /** Open Related / Open Parent for a row; `false` when the kind has nothing to show. */
+  openScoped: { method: "table/openScoped" } as RequestType<RowRef & { direction: ScopeDirection }, boolean>,
+  setScopeEnabled: { method: "table/setScopeEnabled" } as RequestType<{ enabled: boolean }, void>,
+  /** Open the scope source's manifest. */
+  openScopeSource: { method: "table/openScopeSource" } as RequestType<void, void>,
   closeRelated: { method: "table/closeRelated" } as RequestType<{ key: string; dispose?: boolean }, void>,
   openManifest: { method: "table/openManifest" } as RequestType<RowRef, void>,
   savePrefs: { method: "table/savePrefs" } as RequestType<{ sectionId: string; prefs: SectionPrefs }, void>,
@@ -282,6 +310,8 @@ export interface TableWebviewState {
   readonly activeSection?: string;
   /** Detail drawer tab, kept across records and reloads. */
   readonly drawerTab?: string;
+  /** Set on Open Related / Open Parent tabs so they can be rebuilt after reload. */
+  readonly scope?: ScopeRef;
   readonly prefs?: Readonly<Record<string, SectionPrefs>>;
 }
 
