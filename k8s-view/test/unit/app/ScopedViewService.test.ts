@@ -131,4 +131,13 @@ describe("ScopedViewService", () => {
     await contexts.selectContext("prod");
     expect(registry.get(again)).toBeUndefined();
   });
+
+  test("namespace changes keep scoped views; only a context switch clears them", async () => {
+    const id = service.ensure("related", scopeSourceOf(deploy))!;
+    await contexts.selectNamespace({ type: "single", name: "b" });
+    await contexts.selectNamespace({ type: "all" });
+    expect(registry.get(id)?.scope).toBeDefined();
+    await contexts.selectContext("prod");
+    expect(registry.get(id)).toBeUndefined();
+  });
 });

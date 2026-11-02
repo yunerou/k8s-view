@@ -15,14 +15,20 @@ import { ViewRegistry } from "./ViewRegistry";
 @injectable()
 export class ScopedViewService implements vscode.Disposable {
   private readonly subscription: vscode.Disposable;
+  private contextName: string | undefined;
 
   constructor(
     private readonly views = inject(ViewRegistry),
     private readonly contexts = inject(ContextService),
     private readonly source = inject(ResourceSource),
   ) {
-    // Scopes point at resources of one context.
-    this.subscription = contexts.onDidChange(() => this.clear());
+    // Scopes point at resources of one context; namespace changes keep them.
+    this.contextName = contexts.current?.name;
+    this.subscription = contexts.onDidChange((ctx) => {
+      if (ctx?.name === this.contextName) return;
+      this.contextName = ctx?.name;
+      this.clear();
+    });
   }
 
   /**
