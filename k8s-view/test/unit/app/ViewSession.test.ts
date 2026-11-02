@@ -4,9 +4,11 @@ import type { RegisteredView } from "../../../src/app/ViewRegistry";
 import { ViewSession } from "../../../src/app/ViewSession";
 import { ViewSchema } from "../../../src/core/config/schema";
 import { ExpressionEngine } from "../../../src/core/expression/ExpressionEngine";
+import type { KubeResource } from "../../../src/core/resource/KubeResource";
 import { ResourceKind } from "../../../src/core/resource/ResourceKind";
 import { kindViewConfig } from "../../../src/core/view/kindView";
 import { ParentIndex } from "../../../src/core/view/ParentIndex";
+import type { ViewScope } from "../../../src/core/view/ScopeResolver";
 import { compileView } from "../../../src/core/view/ViewDefinition";
 import { FakeResourceSource } from "../helpers/FakeResourceSource";
 import { FakeClusterApi, FakeKubeConfig, FakeSettings, FakeState } from "../helpers/fakes";
@@ -388,5 +390,84 @@ describe("ViewSession parents", () => {
     expect(source.active()).toContain("apps/Deployment|team-a");
     session.closeNode("node");
     expect(source.active()).not.toContain("apps/Deployment|team-a");
+  });
+});
+
+describe("scoped sessions", () => {
+  const owner = (r: KubeResource) => ({ apiVersion: r.kind.apiVersion, kind: r.kind.kind, name: r.name, uid: r.uid });
+  const tree = registered({
+    id: "w",
+    title: "W",
+    sections: [
+      {
+        id: "deployments",
+        title: "D",
+        resources: [{ group: "apps", kind: "Deployment" }],
+        children: [
+          {
+            id: "rs",
+            relation: { type: "ownerRef", group: "apps", kind: "ReplicaSet" },
+            children: [{ id: "pods", relation: { type: "ownerRef", kind: "Pod" } }],
+          },
+        ],
+      },
+    ],
+  });
+  const scoped = (source: KubeResource): RegisteredView => {
+    const base = registered({
+      id: `related.${source.uid}`,
+      title: "Related",
+      sections: [{ id: "pod", title: "Pods", resources: [{ kind: "Pod" }] }],
+    });
+    const scope: ViewScope = {
+      direction: "related",
+      context: "dev",
+      source: { group: "apps", kind: "Deployment", namespace: "team-a", name: source.name, uid: source.uid },
+      children: tree.definition.sections[0]!.children,
+    };
+    return { ...base, dynamic: true, scope };
+  };
+
+  test("filters section items to the scope and watches what the scope needs", async () => {
+    const deploy = res(kinds.deployment, "web", {}, "team-a");
+    const rs = res(
+      kinds.replicaSet,
+      "web-1",
+      { metadata: { name: "web-1", uid: "rs-sc", ownerReferences: [owner(deploy)] } },
+      "team-a",
+    );
+    const mine = res(
+      kinds.pod,
+      "web-1-a",
+      { metadata: { name: "web-1-a", uid: "p-sc", ownerReferences: [owner(rs)] } },
+      "team-a",
+    );
+    const other = res(kinds.pod, "api-1", {}, "team-a");
+    source.set(deployRef, "team-a", [deploy]);
+    source.set(rsRef, "team-a", [rs]);
+    source.set(podRef, "team-a", [mine, other]);
+    const session = await makeSession(scoped(deploy));
+    expect(session.openSection("pod", "table").items.map((r) => r.name)).toEqual(["web-1-a"]);
+    expect(session.scopeState()).toEqual({ enabled: true, sourceMissing: false });
+    expect(source.active()).toEqual(
+      expect.arrayContaining(["/Pod|team-a", "apps/Deployment|team-a", "apps/ReplicaSet|team-a"]),
+    );
+    session.setScopeEnabled(false);
+    expect(session.openSection("pod", "table").items.map((r) => r.name)).toEqual(["api-1", "web-1-a"]);
+    session.closeSection("pod", "table");
+    expect(source.active()).toEqual([]);
+  });
+
+  test("reports a missing source", async () => {
+    const deploy = res(kinds.deployment, "web", {}, "team-a");
+    source.set(deployRef, "team-a", []);
+    source.set(podRef, "team-a", [res(kinds.pod, "api-1", {}, "team-a")]);
+    const session = await makeSession(scoped(deploy));
+    expect(session.openSection("pod", "table").items).toEqual([]);
+    expect(session.scopeState()).toEqual({ enabled: true, sourceMissing: true });
+  });
+
+  test("views without scope have no scope state", async () => {
+    expect((await makeSession()).scopeState()).toBeUndefined();
   });
 });

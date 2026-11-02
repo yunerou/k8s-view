@@ -412,3 +412,25 @@ describe("hidden and dynamic views", () => {
     expect(views.get("kind")?.title).toBe("My kind view");
   });
 });
+
+test("scoped dynamic views are kept out of the view list and can be removed", () => {
+  const registry = new ViewRegistry();
+  const config = ViewSchema.parse({
+    id: "related.u1",
+    title: "Related",
+    sections: [{ id: "pod", title: "Pods", resources: [{ kind: "Pod" }] }],
+  });
+  const scope = {
+    direction: "related" as const,
+    context: "dev",
+    source: { group: "apps", kind: "Deployment", namespace: "a", name: "web", uid: "u1" },
+    children: [],
+  };
+  registry.setDynamic(config, scope);
+  expect(registry.views().map((v) => v.id)).not.toContain("related.u1");
+  expect(registry.allViews().map((v) => v.id)).not.toContain("related.u1");
+  expect(registry.scopedViews().map((v) => v.id)).toEqual(["related.u1"]);
+  expect(registry.get("related.u1")?.scope).toBe(scope);
+  registry.removeDynamic("related.u1");
+  expect(registry.get("related.u1")).toBeUndefined();
+});

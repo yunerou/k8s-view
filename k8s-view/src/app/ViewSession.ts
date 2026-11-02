@@ -3,8 +3,14 @@ import type { ClusterContext } from "../core/context/ClusterContext";
 import { stringify } from "../core/expression/ExpressionEngine";
 import type { KubeResource } from "../core/resource/KubeResource";
 import { metricRef, withResourceMetrics } from "../core/resource/resourceMetrics";
-import type { ParentHit, ParentIndex } from "../core/view/ParentIndex";
+import { type ParentHit, ParentIndex } from "../core/view/ParentIndex";
 import type { ChildItem, KindDemand } from "../core/view/RelationResolver";
+import {
+  EMPTY_SCOPE_RESOLUTION,
+  resolveScope,
+  type ScopeResolution,
+  type ScopeSource,
+} from "../core/view/ScopeResolver";
 import type { ChildDefinition, SectionDefinition, ViewDefinition } from "../core/view/ViewDefinition";
 import type { ContextService } from "./ContextService";
 import type { EntryState, KindRef, ResourceLease, ResourceSource } from "./ports/ResourceSource";
@@ -58,6 +64,8 @@ export class ViewSession implements vscode.Disposable {
   private visible = false;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private generation = 0;
+  private scopeEnabled = true;
+  private sourceMissing = false;
   private readonly disposables: vscode.Disposable[] = [];
 
   constructor(
@@ -65,6 +73,7 @@ export class ViewSession implements vscode.Disposable {
     private readonly contexts: ContextService,
     private readonly source: ResourceSource,
     private readonly settings: Settings,
+    private readonly parentIndex: () => ParentIndex = () => ParentIndex.empty,
   ) {
     this.disposables.push(
       contexts.onDidChange(() => this.reset()),
@@ -128,13 +137,66 @@ export class ViewSession implements vscode.Disposable {
     return this.definition.sections.find((s) => s.id === id);
   }
 
+  /** Open Related / Open Parent: turn the scope filter off (all resources of the kinds) or back on. */
+  setScopeEnabled(enabled: boolean): void {
+    if (this.scopeEnabled === enabled) return;
+    this.scopeEnabled = enabled;
+    this.changed.fire();
+  }
+
+  scopeState(): { readonly enabled: boolean; readonly sourceMissing: boolean } | undefined {
+    return this.registered.scope
+      ? { enabled: this.scopeEnabled, sourceMissing: this.scopeEnabled && this.sourceMissing }
+      : undefined;
+  }
+
+  /** Resolve the view's scope (when enabled) and hold leases for the kinds it needs under `owner`. */
+  private activeScope(
+    ctx: ClusterContext,
+    owner: string,
+  ): { readonly source: ScopeSource; readonly result: ScopeResolution } | undefined {
+    const scope = this.registered.scope;
+    if (!scope || !this.scopeEnabled) {
+      this.release(owner);
+      this.sourceMissing = false;
+      return undefined;
+    }
+    if (scope.context !== ctx.name) {
+      this.release(owner);
+      return { source: scope.source, result: EMPTY_SCOPE_RESOLUTION };
+    }
+    const result = resolveScope(scope, this.source.lookup(ctx), this.parentIndex(), ctx.scope.type === "all");
+    this.hold(owner, result.demands);
+    this.sourceMissing = result.sourceMissing;
+    return { source: scope.source, result };
+  }
+
   /** `owner` separates tree and table leases: closing a tree section does not remove the table's data. */
   openSection(id: string, owner = "tree"): SectionContent {
     const section = this.sectionDefinition(id);
     const ctx = this.context;
     if (!section || !ctx) return { state: "ready", items: [], groups: undefined, problems: [] };
     const refs = section.resources.filter((r) => this.kindAvailable.get(kindKey(r)) === true);
-    const namespace = section.allNamespaces ? undefined : ctx.namespace;
+    const lookup = this.source.lookup(ctx);
+    const scope = this.activeScope(ctx, `${owner}:section:${id}:scope`);
+    const namespace = scope ? scope.source.namespace : section.allNamespaces ? undefined : ctx.namespace;
+    /** Scoped sections watch where the scope's resources live; without list permission there, fall back to the source's namespace. */
+    const namespacesOf = (ref: KindRef): (string | undefined)[] => {
+      if (!scope) return [namespace];
+      const wanted = [
+        ...new Set(
+          scope.result.demands.filter((d) => d.group === ref.group && d.kind === ref.kind).map((d) => d.namespace),
+        ),
+      ];
+      const list = wanted.length > 0 ? wanted : [scope.source.namespace];
+      const fallback = scope.source.namespace;
+      return list.includes(undefined) &&
+        fallback !== undefined &&
+        !list.includes(fallback) &&
+        lookup.entry(ref, undefined)?.state === "forbidden"
+        ? [...list, fallback]
+        : list;
+    };
     const metricKinds = section.columns.some((c) => c.usesMetrics)
       ? refs.filter((r) => r.group === "" && (r.kind === "Pod" || r.kind === "Node"))
       : [];
@@ -144,21 +206,30 @@ export class ViewSession implements vscode.Disposable {
     }));
     if (metricKinds.some((r) => r.kind === "Node")) dependencies.push({ group: "", kind: "Pod", namespace: undefined });
     this.hold(`${owner}:section:${id}`, [
-      ...refs.map((r) => ({ group: r.group, kind: r.kind, namespace })),
+      ...refs.flatMap((r) => namespacesOf(r).map((ns) => ({ group: r.group, kind: r.kind, namespace: ns }))),
       ...dependencies,
     ]);
-    const lookup = this.source.lookup(ctx);
     let loading = false;
     const problems: SectionProblem[] = [];
     const items: KubeResource[] = [];
+    const seen = new Set<string>();
     for (const ref of refs) {
-      const entry = lookup.entry(ref, namespace);
-      if (entry && (entry.state === "forbidden" || entry.state === "error")) {
-        problems.push({ kind: ref.kind, state: entry.state, message: entry.message });
+      for (const ns of namespacesOf(ref)) {
+        const entry = lookup.entry(ref, ns);
+        if (entry && (entry.state === "forbidden" || entry.state === "error")) {
+          problems.push({ kind: ref.kind, state: entry.state, message: entry.message });
+        }
+        const list = lookup.list(ref.group, ref.kind, ns);
+        if (list === undefined) {
+          loading = true;
+          continue;
+        }
+        for (const r of list) {
+          if (seen.has(r.uid) || !section.accepts(r) || (scope && !scope.result.uids.has(r.uid))) continue;
+          seen.add(r.uid);
+          items.push(r);
+        }
       }
-      const list = lookup.list(ref.group, ref.kind, namespace);
-      if (list === undefined) loading = true;
-      else items.push(...list.filter((r) => section.accepts(r)));
     }
     for (const d of dependencies) {
       const entry = lookup.entry(d, d.namespace);
@@ -207,6 +278,7 @@ export class ViewSession implements vscode.Disposable {
 
   closeSection(id: string, owner = "tree"): void {
     this.release(`${owner}:section:${id}`);
+    this.release(`${owner}:section:${id}:scope`);
   }
 
   /** Node children resolved through relations; leases are held under `nodeKey` until `closeNode`. */

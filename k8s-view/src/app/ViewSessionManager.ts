@@ -73,7 +73,7 @@ export class ViewSessionManager implements vscode.Disposable {
   }
 
   private sync(): void {
-    const views = this.registry.views();
+    const views = [...this.registry.views(), ...this.registry.scopedViews()];
     const ids = new Set(views.map((v) => v.id));
     for (const [id, session] of this.sessions) {
       if (!ids.has(id)) {
@@ -87,7 +87,7 @@ export class ViewSessionManager implements vscode.Disposable {
         if (existing.view !== view) existing.update(view);
         continue;
       }
-      const session = new ViewSession(view, this.contexts, this.source, this.settings);
+      const session = new ViewSession(view, this.contexts, this.source, this.settings, () => this.registry.parentIndex);
       const v = this.visibility.get(view.id);
       if (v) session.setVisible(v.tree || v.table);
       this.sessions.set(view.id, session);

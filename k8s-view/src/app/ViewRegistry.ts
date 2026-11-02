@@ -5,6 +5,7 @@ import { type ViewConfig, type ViewPatchConfig, ViewSchema } from "../core/confi
 import { ExpressionEngine } from "../core/expression/ExpressionEngine";
 import { applyViewPatch } from "../core/view/merge";
 import { ParentIndex } from "../core/view/ParentIndex";
+import type { ViewScope } from "../core/view/ScopeResolver";
 import { compileView, type ViewDefinition } from "../core/view/ViewDefinition";
 import type { ConfigLocatedIssue, LoadedConfigFile } from "./ports/ConfigSource";
 
@@ -20,6 +21,8 @@ export interface RegisteredView {
   readonly untrusted: boolean;
   /** View generated in code ("Single resource kind" view), with no file to edit. */
   readonly dynamic?: boolean;
+  /** Open Related / Open Parent tab: rows are limited to this scope; never listed as a regular view. */
+  readonly scope?: ViewScope;
 }
 
 export interface ApplyContext {
@@ -64,8 +67,13 @@ export class ViewRegistry implements vscode.Disposable {
   /** All enabled views, including hidden ones (for "Show/hide views…"). */
   allViews(): RegisteredView[] {
     return [...this.entries.values()]
-      .filter((v) => v.definition.enabled)
+      .filter((v) => v.definition.enabled && !v.scope)
       .sort((a, b) => (a.definition.order ?? 1000) - (b.definition.order ?? 1000) || a.title.localeCompare(b.title));
+  }
+
+  /** Open Related / Open Parent views (one per table tab). */
+  scopedViews(): RegisteredView[] {
+    return [...this.entries.values()].filter((v) => v.scope);
   }
 
   get(id: string): RegisteredView | undefined {
@@ -90,7 +98,7 @@ export class ViewRegistry implements vscode.Disposable {
   }
 
   /** Add/replace a generated view; a config-file view with the same ID still takes precedence. */
-  setDynamic(config: ViewConfig): void {
+  setDynamic(config: ViewConfig, scope?: ViewScope): void {
     const { view } = compileView(config, this.safeEngine);
     this.dynamic.set(config.id, {
       id: config.id,
@@ -101,8 +109,13 @@ export class ViewRegistry implements vscode.Disposable {
       index: -1,
       untrusted: false,
       dynamic: true,
+      ...(scope ? { scope } : {}),
     });
     this.rebuild();
+  }
+
+  removeDynamic(id: string): void {
+    if (this.dynamic.delete(id)) this.rebuild();
   }
 
   apply(files: readonly LoadedConfigFile[], ctx: ApplyContext, issues: IssueMap): void {
@@ -176,7 +189,9 @@ export class ViewRegistry implements vscode.Disposable {
     const next = new Map(this.fromFiles);
     for (const [id, view] of this.dynamic) if (!next.has(id)) next.set(id, view);
     this.entries = next;
-    this.index = ParentIndex.build([...next.values()].filter((v) => v.definition.enabled).map((v) => v.definition));
+    this.index = ParentIndex.build(
+      [...next.values()].filter((v) => v.definition.enabled && !v.scope).map((v) => v.definition),
+    );
     this.changed.fire();
   }
 
