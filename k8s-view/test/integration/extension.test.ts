@@ -45,7 +45,7 @@ describe("K8s View on a kind cluster", () => {
 
   it("lists fixture resources in the built-in views", async () => {
     const workload = api.sessions.session("workload")!;
-    workload.setVisible(true);
+    workload.setVisible("tree", true);
     await workload.whenReady();
     const deployments = await waitFor("deployment web", () => {
       const c = workload.openSection("deployments");

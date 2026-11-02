@@ -15,6 +15,9 @@ import {
 
 const AGE_REFRESH_MS = 60_000;
 
+/** Session lease owner for a tree node: `tree:` leases are released when the tree is hidden. */
+const nodeLease = (key: string) => `tree:node:${key}`;
+
 /** Active port-forward source (PortForwardManager) for views with `portForwards: true`. */
 export interface PortForwardSource {
   readonly onDidChange: vscode.Event<void>;
@@ -151,7 +154,7 @@ export class ResourceTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
       case "resource":
         return this.resourceChildren(session, node);
       case "folder": {
-        const [content] = session.openChildren(node.key, node.parent, [node.child]);
+        const [content] = session.openChildren(nodeLease(node.key), node.parent, [node.child]);
         if (!content) return [];
         return [
           ...content.hints.map((h, i) => message(node, `hint-${i}`, h, "info")),
@@ -174,11 +177,11 @@ export class ResourceTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
     if (!session) return;
     if (node.type === "section") {
       session.closeSection(node.sectionId);
-      session.closeNode(node.key);
+      session.closeNode(nodeLease(node.key));
       this.errorsBySection.delete(`${node.viewId}/${node.sectionId}`);
       this.emitErrorCount();
     } else if (node.type === "resource" || node.type === "folder" || node.type === "group") {
-      session.closeNode(node.key);
+      session.closeNode(nodeLease(node.key));
     }
   }
 
@@ -296,7 +299,7 @@ export class ResourceTreeProvider implements vscode.TreeDataProvider<TreeNode>, 
   }
 
   private resourceChildren(session: ViewSession, node: Extract<TreeNode, { type: "resource" }>): TreeNode[] {
-    const contents = session.openChildren(node.key, node.resource, node.children);
+    const contents = session.openChildren(nodeLease(node.key), node.resource, node.children);
     const out: TreeNode[] = [];
     for (const content of contents) {
       out.push(...content.hints.map((h, i) => message(node, `${content.def.id}/hint-${i}`, h, "info")));

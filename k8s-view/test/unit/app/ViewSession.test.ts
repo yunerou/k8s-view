@@ -59,7 +59,7 @@ let settings: FakeSettings;
 
 async function makeSession(view = workload) {
   const session = new ViewSession(view, contexts, source, settings);
-  session.setVisible(true);
+  session.setVisible("tree", true);
   await session.whenReady();
   return session;
 }
@@ -267,7 +267,7 @@ describe("ViewSession lifecycle", () => {
   test("hiding the view releases leases; refresh resyncs", async () => {
     const session = await makeSession();
     session.openSection("pods");
-    session.setVisible(false);
+    session.setVisible("tree", false);
     expect(source.active()).toEqual([]);
     session.refresh();
     expect(source.resynced).toBe(1);
@@ -295,7 +295,7 @@ describe("ViewSession metrics dependencies", () => {
     source.set(podRef, "team-a", [
       res(kinds.pod, "p", { spec: { containers: [{ resources: { requests: { cpu: "1" } } }] } }, "team-a"),
     ]);
-    let content = session.openSection("pods");
+    let content = session.openSection("pods", "table");
     expect(content.state).toBe("ready");
     expect(source.active()).toEqual(["/Pod|team-a", "metrics.k8s.io/PodMetrics|team-a"]);
     expect(content.items[0]!.object["resourceMetrics"]).toMatchObject({ cpu: { request: 1, used: undefined } });
@@ -305,15 +305,69 @@ describe("ViewSession metrics dependencies", () => {
       res(metricKind, "p", { containers: [{ usage: { cpu: "500m", memory: "500M" } }] }, "team-a"),
     ]);
     expect(fired).toBeGreaterThan(0);
-    content = session.openSection("pods");
+    content = session.openSection("pods", "table");
     expect(content.items[0]!.object["resourceMetrics"]).toMatchObject({ cpu: { used: 0.5, percent: 50 } });
     source.setState(metricKind, "team-a", { state: "error", message: "Metrics unavailable" });
-    content = session.openSection("pods");
+    content = session.openSection("pods", "table");
     expect(content.problems).toContainEqual({ kind: "PodMetrics", state: "error", message: "Metrics unavailable" });
     expect(content.items[0]!.object["resourceMetrics"]).toMatchObject({ cpu: { used: undefined, request: 1 } });
-    session.closeSection("pods");
+    session.closeSection("pods", "table");
     expect(source.active()).toEqual([]);
     session.dispose();
+  });
+
+  test("the tree skips metric leases unless it sorts by a metric column", async () => {
+    source.addKind(metricKind);
+    const session = await makeSession(metricView);
+    session.openSection("pods");
+    expect(source.active()).toEqual(["/Pod|team-a"]);
+    session.dispose();
+    const sorted = await makeSession(
+      registered({
+        id: "sorted",
+        title: "Sorted",
+        sections: [
+          {
+            id: "pods",
+            title: "Pods",
+            resources: [{ kind: "Pod" }],
+            sort: { by: "cpu", order: "desc" },
+            columns: [{ id: "cpu", title: "CPU", path: "$.resourceMetrics.cpu.used", render: "cpu", default: "-" }],
+          },
+        ],
+      }),
+    );
+    sorted.openSection("pods");
+    expect(source.active()).toEqual(["/Pod|team-a", "metrics.k8s.io/PodMetrics|team-a"]);
+    sorted.dispose();
+  });
+});
+
+describe("ViewSession lease owners", () => {
+  test("hiding the tree keeps the visible table's leases", async () => {
+    const session = await makeSession();
+    session.setVisible("table", true);
+    session.openSection("deployments");
+    session.openChildren("tree:node:deployments/web", res(kinds.deployment, "web", {}, "team-a"), [
+      ...session.sectionDefinition("deployments")!.children,
+    ]);
+    session.openSection("pods", "table");
+    session.setVisible("tree", false);
+    expect(source.active()).toEqual(["/Pod|team-a"]);
+    expect(session.isVisible).toBe(true);
+    session.setVisible("table", false);
+    expect(source.active()).toEqual([]);
+    expect(session.isVisible).toBe(false);
+  });
+
+  test("hold: false reads the shared store without acquiring", async () => {
+    const session = await makeSession();
+    expect(session.openSection("pods", "table", { hold: false }).state).toBe("loading");
+    expect(source.active()).toEqual([]);
+    source.set(podRef, "team-a", [res(kinds.pod, "p", { status: { phase: "Running" } }, "team-a")]);
+    const content = session.openSection("pods", "table", { hold: false });
+    expect(content.items.map((r) => r.name)).toEqual(["p"]);
+    expect(source.active()).toEqual([]);
   });
 });
 
@@ -322,6 +376,7 @@ test("node metrics use cluster scope; forbidden cluster-wide Pod access leaves b
   const nodeMetricKind = new ResourceKind("metrics.k8s.io", "v1beta1", "NodeMetrics", "nodes", false);
   source.addKind(nodeKind, nodeMetricKind);
   const session = await makeSession(registered(kindViewConfig({ group: "", kind: "Node" })));
+  session.setVisible("table", true);
   source.set(nodeKind, undefined, [res(nodeKind, "n")]);
   source.set(nodeMetricKind, undefined, [res(nodeMetricKind, "n", { usage: { cpu: "500m", memory: "500M" } })]);
   source.set(podRef, undefined, [
@@ -332,7 +387,7 @@ test("node metrics use cluster scope; forbidden cluster-wide Pod access leaves b
       "other-team",
     ),
   ]);
-  const content = session.openSection("resources");
+  const content = session.openSection("resources", "table");
   expect(source.active()).toContain("metrics.k8s.io/NodeMetrics|*");
   expect(source.active()).toContain("/Pod|*");
   expect(content.items[0]!.object["resourceMetrics"]).toMatchObject({ cpu: { used: 0.5, request: 1, percent: 50 } });
@@ -346,12 +401,12 @@ test("node metrics use cluster scope; forbidden cluster-wide Pod access leaves b
     ]),
   );
   source.setState(podRef, undefined, { state: "forbidden", message: "No cluster-wide Pod access" });
-  const forbidden = session.openSection("resources");
+  const forbidden = session.openSection("resources", "table");
   expect(forbidden.problems).toContainEqual({ kind: "Pod", state: "forbidden", message: "No cluster-wide Pod access" });
   expect(forbidden.items[0]!.object["resourceMetrics"]).toMatchObject({
     cpu: { used: 0.5, request: undefined, percent: undefined },
   });
-  session.setVisible(false);
+  session.setVisible("table", false);
   expect(source.active()).toEqual([]);
   session.dispose();
 });
@@ -361,7 +416,7 @@ test("missing Metrics Server keeps Pods and their requests visible", async () =>
   source.set(podRef, "team-a", [
     res(kinds.pod, "p", { spec: { containers: [{ resources: { requests: { cpu: "1" } } }] } }, "team-a"),
   ]);
-  const content = session.openSection("resources");
+  const content = session.openSection("resources", "table");
   expect(content.state).toBe("ready");
   expect(content.problems).toContainEqual({ kind: "PodMetrics", state: "unavailable", message: undefined });
   expect(content.items[0]!.object["resourceMetrics"]).toMatchObject({ cpu: { used: undefined, request: 1 } });

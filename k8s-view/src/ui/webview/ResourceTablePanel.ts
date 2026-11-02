@@ -12,7 +12,7 @@ import { StateStore } from "../../app/ports/StateStore";
 import { ScopedViewService } from "../../app/ScopedViewService";
 import { buildSection, diffSection, EMPTY_SNAPSHOT, type SectionSnapshot } from "../../app/TableModel";
 import type { RegisteredView } from "../../app/ViewRegistry";
-import type { ViewSession } from "../../app/ViewSession";
+import type { SectionContent, ViewSession } from "../../app/ViewSession";
 import { ViewSessionManager } from "../../app/ViewSessionManager";
 import { formatAge } from "../../core/resource/format";
 import type { KubeResource } from "../../core/resource/KubeResource";
@@ -20,7 +20,7 @@ import { resourceDocumentation } from "../../core/resource/resourceDocumentation
 import type { ParentVia } from "../../core/view/ParentIndex";
 import { type ScopeDirection, type ScopeSource, scopeSourceOf, type ViewScope } from "../../core/view/ScopeResolver";
 import { scopedDirection } from "../../core/view/scopedView";
-import type { ChildDefinition } from "../../core/view/ViewDefinition";
+import type { ChildDefinition, SectionDefinition } from "../../core/view/ViewDefinition";
 import { EXTENSION_CONTEXT } from "../../di/tokens";
 import type { HotkeyAction } from "../../shared/hotkeys";
 import type { RelatedGroup, RelatedItem, ScopeRef } from "../../shared/protocol";
@@ -51,6 +51,11 @@ const prefsKey = (viewId: string) => {
   const direction = scopedDirection(viewId);
   return `k8sView.tablePrefs/${direction ? `scoped:${direction}` : viewId}`;
 };
+
+/** The webview falls back to the first tab when the remembered one is gone. */
+function activeOf(defs: readonly SectionDefinition[], id: string | undefined): string | undefined {
+  return defs.some((d) => d.id === id) ? id : defs[0]?.id;
+}
 
 function toScopeRef(scope: ViewScope): ScopeRef {
   const s = scope.source;
@@ -218,6 +223,8 @@ class TablePanel implements vscode.Disposable {
   private snapshots = new Map<string, SectionSnapshot>();
   private resources = new Map<string, Map<string, KubeResource>>();
   private openSections = new Set<string>();
+  /** Section tab shown in the webview: the only section holding leases. */
+  private activeSection: string | undefined;
   private detailsKey: string | undefined;
   private parentsKey: string | undefined;
   private scopeKey = "";
@@ -229,6 +236,8 @@ class TablePanel implements vscode.Disposable {
   private readonly parentNodes = new Map<string, KubeResource>();
   private readonly relatedNodes = new Map<string, { resource: KubeResource; children: readonly ChildDefinition[] }>();
   private dirty = false;
+  /** The webview asked for its first model: until then nothing is built, so no section is watched before the tab is known. */
+  private modelRequested = false;
   private readonly disposables: vscode.Disposable[] = [];
 
   constructor(
@@ -243,7 +252,16 @@ class TablePanel implements vscode.Disposable {
     this.participant = this.messenger.registerWebviewPanel(panel);
     const m = this.messenger;
     this.disposables.push(
-      m.onRequest(TableRequests.getViewModel, () => this.model()),
+      m.onRequest(TableRequests.getViewModel, (params) => {
+        if (params?.activeSection) this.activeSection = params.activeSection;
+        this.modelRequested = true;
+        return this.model();
+      }),
+      m.onRequest(TableRequests.setActiveSection, ({ sectionId }) => {
+        if (sectionId === this.activeSection) return;
+        this.activeSection = sectionId;
+        this.update();
+      }),
       m.onRequest(TableRequests.commandsFor, ({ sectionId, uids }) => this.commandsFor(sectionId, uids)),
       m.onRequest(TableRequests.pickCommand, ({ sectionId, uids }) => this.pickCommand(sectionId, uids)),
       m.onRequest(TableRequests.runCommand, async ({ commandId, sectionId, uids }) => {
@@ -347,6 +365,7 @@ class TablePanel implements vscode.Disposable {
     this.closeSections();
     this.owner.deps.sessions.setTableVisible(this.viewId, false);
     this.currentViewId = viewId;
+    this.activeSection = undefined;
     this.dirty = false;
     this.visibilityChanged();
     this.reset();
@@ -450,9 +469,10 @@ class TablePanel implements vscode.Disposable {
     const now = Date.now();
     this.snapshots = new Map();
     this.resources = new Map();
-    const sections = (session?.sections() ?? []).map((def) => {
-      this.openSections.add(def.id);
-      const content = session!.openSection(def.id, "table");
+    const defs = session?.sections() ?? [];
+    const active = activeOf(defs, this.activeSection);
+    const sections = defs.map((def) => {
+      const content = this.content(session!, def, active);
       const built = buildSection(def, content, ctx?.scope.type === "all", now);
       this.snapshots.set(def.id, diffSection(def.id, EMPTY_SNAPSHOT, built).snapshot);
       this.resources.set(def.id, new Map(content.items.map((r) => [r.uid, r])));
@@ -489,12 +509,13 @@ class TablePanel implements vscode.Disposable {
       this.dirty = true;
       return;
     }
+    if (!this.modelRequested) return;
     this.messenger.sendNotification(TableNotifications.reset, this.participant, this.model());
   }
 
   private update(): void {
     const session = this.session;
-    if (!session) return;
+    if (!session || !this.modelRequested) return;
     if (!this.panel.visible) {
       this.dirty = true;
       return;
@@ -508,9 +529,9 @@ class TablePanel implements vscode.Disposable {
       this.reset();
       return;
     }
+    const active = activeOf(defs, this.activeSection);
     for (const def of defs) {
-      const content = session.openSection(def.id, "table");
-      this.openSections.add(def.id);
+      const content = this.content(session, def, active);
       const built = buildSection(def, content, ctx?.scope.type === "all", now);
       const { patch, snapshot, changed } = diffSection(def.id, this.snapshots.get(def.id) ?? EMPTY_SNAPSHOT, built);
       this.snapshots.set(def.id, snapshot);
@@ -519,6 +540,16 @@ class TablePanel implements vscode.Disposable {
     }
     // Scope turned off/on or source deleted: banner and rows change together, so send a full model.
     if (JSON.stringify(session.scopeState() ?? null) !== this.scopeKey) this.reset();
+  }
+
+  /** Only the active tab holds leases; other tabs show what the shared store already has (no count while unknown). */
+  private content(session: ViewSession, def: SectionDefinition, active: string | undefined): SectionContent {
+    if (def.id === active) {
+      this.openSections.add(def.id);
+      return session.openSection(def.id, "table");
+    }
+    if (this.openSections.delete(def.id)) session.closeSection(def.id, "table");
+    return session.openSection(def.id, "table", { hold: false });
   }
 
   private resolve(sectionId: string, uids: readonly string[]): KubeResource[] {

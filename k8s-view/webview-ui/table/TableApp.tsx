@@ -80,8 +80,11 @@ export function TableApp() {
   }, []);
 
   useEffect(() => {
-    request(TableRequests.getViewModel).then(adopt, report);
-  }, [adopt, report]);
+    request(TableRequests.getViewModel, saved?.activeSection ? { activeSection: saved.activeSection } : {}).then(
+      adopt,
+      report,
+    );
+  }, [adopt, report, saved]);
 
   useNotification(TableNotifications.reset, (m) => {
     adopt(m);
@@ -130,6 +133,12 @@ export function TableApp() {
         : {}),
     });
   }, [model?.viewId, activeId, prefs, model, drawerTab]);
+
+  /** The extension watches only the active tab's kinds. */
+  useEffect(() => {
+    if (model?.viewId === undefined || activeId === undefined) return;
+    request(TableRequests.setActiveSection, { sectionId: activeId }).catch(report);
+  }, [model?.viewId, activeId, report]);
 
   const savePrefs = useDebounced((sectionId: string, p: SectionPrefs) => {
     request(TableRequests.savePrefs, { sectionId, prefs: p }).catch(report);
@@ -264,7 +273,12 @@ export function TableApp() {
         </Banner>
       )}
       <Tabs
-        items={sections.map((s) => ({ id: s.id, label: s.title, icon: s.icon, count: s.rows.length }))}
+        items={sections.map((s) => ({
+          id: s.id,
+          label: s.title,
+          icon: s.icon,
+          count: s.state === "loading" ? undefined : s.rows.length,
+        }))}
         active={activeId}
         onChange={selectSection}
         label={l10n.t("Sections")}

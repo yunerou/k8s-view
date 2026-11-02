@@ -7,13 +7,13 @@ import { ContextService } from "./ContextService";
 import { ResourceSource } from "./ports/ResourceSource";
 import { Settings } from "./ports/Settings";
 import { ViewRegistry } from "./ViewRegistry";
-import { ViewSession } from "./ViewSession";
+import { type LeaseOwner, ViewSession } from "./ViewSession";
 
 /** One ViewSession per registered view; the tree and table for a view share a session (and leases). */
 @injectable()
 export class ViewSessionManager implements vscode.Disposable {
   private readonly sessions = new Map<string, ViewSession>();
-  private readonly visibility = new Map<string, { tree: boolean; table: boolean }>();
+  private readonly visibility = new Map<string, Record<LeaseOwner, boolean>>();
   private readonly changed = new vscode.EventEmitter<void>();
   /** View (session) list changed after config reload. */
   readonly onDidChangeSessions = this.changed.event;
@@ -52,11 +52,11 @@ export class ViewSessionManager implements vscode.Disposable {
   }
 
   setTreeVisible(viewId: string, visible: boolean): void {
-    this.setVisibility(viewId, { tree: visible });
+    this.setVisibility(viewId, "tree", visible);
   }
 
   setTableVisible(viewId: string, visible: boolean): void {
-    this.setVisibility(viewId, { table: visible });
+    this.setVisibility(viewId, "table", visible);
   }
 
   dispose(): void {
@@ -66,10 +66,10 @@ export class ViewSessionManager implements vscode.Disposable {
     this.changed.dispose();
   }
 
-  private setVisibility(viewId: string, patch: Partial<{ tree: boolean; table: boolean }>): void {
-    const v = { ...(this.visibility.get(viewId) ?? { tree: false, table: false }), ...patch };
+  private setVisibility(viewId: string, owner: LeaseOwner, visible: boolean): void {
+    const v = { ...(this.visibility.get(viewId) ?? { tree: false, table: false }), [owner]: visible };
     this.visibility.set(viewId, v);
-    this.sessions.get(viewId)?.setVisible(v.tree || v.table);
+    this.sessions.get(viewId)?.setVisible(owner, visible);
   }
 
   private sync(): void {
@@ -89,7 +89,10 @@ export class ViewSessionManager implements vscode.Disposable {
       }
       const session = new ViewSession(view, this.contexts, this.source, this.settings, () => this.registry.parentIndex);
       const v = this.visibility.get(view.id);
-      if (v) session.setVisible(v.tree || v.table);
+      if (v) {
+        session.setVisible("tree", v.tree);
+        session.setVisible("table", v.table);
+      }
       this.sessions.set(view.id, session);
     }
     this.changed.fire();

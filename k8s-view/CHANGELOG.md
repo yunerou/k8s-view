@@ -14,6 +14,10 @@ even minor versions (0.2.x) are stable.
 - Details: the drawer keeps the selected tab when another row is opened; new Parent tab (owners, selecting Services, Nodes, referencing routes...).
 - Commands: Open Related / Open Parent open a table tab limited to a resource's related or parent resources, updated live.
 
+### Changed
+
+- Fewer watches: a table tab watches only its active section (other section tabs show data already loaded, without a count until known); the sidebar no longer watches metrics (or every Pod for Nodes) unless it sorts by a metric column; hiding the sidebar releases its watches even while a table of the same view is open.
+
 ### Fixed
 
 - Show **Delete** for every resource kind, including custom and cluster-scoped resources, for both single

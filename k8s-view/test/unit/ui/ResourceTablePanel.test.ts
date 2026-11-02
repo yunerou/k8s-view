@@ -142,6 +142,14 @@ beforeEach(async () => {
           ],
         },
         { id: "pods", title: "Pods", sections: [{ id: "pods", title: "Pods", resources: [{ kind: "Pod" }] }] },
+        {
+          id: "multi",
+          title: "Multi",
+          sections: [
+            { id: "deployments", title: "Deployments", resources: [{ group: "apps", kind: "Deployment" }] },
+            { id: "pods", title: "Pods", resources: [{ kind: "Pod" }] },
+          ],
+        },
       ],
       commands: [
         {
@@ -314,6 +322,38 @@ describe("table commands and related tree", () => {
     ]);
     const up = await request<RelatedGroup[]>("parents", { key: `table:parents:${pod.uid}/${rs.uid}` });
     expect(up.map((g) => [g.title, g.items.map((i) => i.name)])).toEqual([["Deployment", ["web"]]]);
+  });
+});
+
+describe("section tabs", () => {
+  async function openMulti(activeSection?: string) {
+    await sessions.session("multi")!.whenReady();
+    panel = makePanel();
+    source.acquired = [];
+    tables.open("multi");
+    return request<TableViewModel>("getViewModel", activeSection ? { activeSection } : {});
+  }
+
+  test("only the active tab watches its kinds; other tabs show the store's data", async () => {
+    const vm = await openMulti();
+    expect(source.acquired).toEqual(["apps/Deployment|a"]);
+    expect(vm.sections.map((s) => [s.id, s.state])).toEqual([
+      ["deployments", "ready"],
+      ["pods", "loading"],
+    ]);
+    await request("setActiveSection", { sectionId: "pods" });
+    expect(source.active()).toContain("/Pod|a");
+    // The workload tab still holds its Deployment lease; this tab released its own.
+    expect(source.leases.get("apps/Deployment|a")).toBe(1);
+    await request("setActiveSection", { sectionId: "deployments" });
+    expect(source.active()).not.toContain("/Pod|a");
+  });
+
+  test("the restored tab is the one watched from the first model", async () => {
+    const vm = await openMulti("pods");
+    expect(source.acquired).toEqual(["/Pod|a"]);
+    // Deployments are already in the shared store (workload tab): shown without a lease.
+    expect(vm.sections.find((s) => s.id === "deployments")!.rows.map((r) => r.name)).toEqual(["api", "web"]);
   });
 });
 

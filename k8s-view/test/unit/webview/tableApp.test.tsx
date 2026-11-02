@@ -68,6 +68,25 @@ describe("TableApp", () => {
     expect(bodyUids()).toEqual(["p2"]);
   });
 
+  test("tells the extension which tab to watch; unknown tabs show no count", async () => {
+    setInitialState({ viewId: "workload", activeSection: "pods", prefs: {} } satisfies TableWebviewState);
+    respond.mockImplementation((method) =>
+      method === "table/getViewModel"
+        ? model([section("deployments", [], { state: "loading" }), section("pods", [row("p1")])])
+        : undefined,
+    );
+    render(<TableApp />);
+    const deployments = await screen.findByRole("tab", { name: /Deployments/ });
+    expect(requests("table/getViewModel")).toEqual([{ activeSection: "pods" }]);
+    expect(deployments.querySelector(".count-badge")).toBeNull();
+    expect(screen.getByRole("tab", { name: /Pods/ }).querySelector(".count-badge")?.textContent).toBe("1");
+    await waitFor(() => expect(requests("table/setActiveSection")).toEqual([{ sectionId: "pods" }]));
+    fireEvent.click(deployments);
+    await waitFor(() =>
+      expect(requests("table/setActiveSection")).toEqual([{ sectionId: "pods" }, { sectionId: "deployments" }]),
+    );
+  });
+
   test("applies patches: upsert, remove, reorder, problems and loading", async () => {
     render(<TableApp />);
     await screen.findByRole("tab", { name: /Deployments/ });

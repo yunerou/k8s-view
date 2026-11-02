@@ -253,7 +253,10 @@ export interface RowDetails {
 }
 
 export const TableRequests = {
-  getViewModel: { method: "table/getViewModel" } as RequestType<void, TableViewModel>,
+  /** `activeSection`: the restored section tab, the only one whose kinds are watched. */
+  getViewModel: { method: "table/getViewModel" } as RequestType<{ activeSection?: string }, TableViewModel>,
+  /** Section tab changed: watch its kinds instead of the previous tab's. */
+  setActiveSection: { method: "table/setActiveSection" } as RequestType<{ sectionId: string }, void>,
   commandsFor: { method: "table/commandsFor" } as RequestType<
     { sectionId: string; uids: readonly string[] },
     readonly CommandItem[]

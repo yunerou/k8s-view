@@ -45,6 +45,9 @@ export interface ParentContent {
   readonly hints: readonly string[];
 }
 
+/** Lease owners: each holds its own leases, released when it is hidden. */
+export type LeaseOwner = "tree" | "table";
+
 const kindKey = (r: KindRef) => `${r.group}/${r.kind}`;
 const leaseKey = (r: KindRef, ns: string | undefined) => `${kindKey(r)}|${ns ?? "*"}`;
 
@@ -61,7 +64,7 @@ export class ViewSession implements vscode.Disposable {
   /** Available cluster kinds are known (discovery completed). */
   private availabilityKnown = false;
   private ready: Promise<void> = Promise.resolve();
-  private visible = false;
+  private readonly visibleOwners = new Set<LeaseOwner>();
   private timer: ReturnType<typeof setTimeout> | undefined;
   private generation = 0;
   private scopeEnabled = true;
@@ -110,7 +113,7 @@ export class ViewSession implements vscode.Disposable {
   }
 
   get isVisible(): boolean {
-    return this.visible;
+    return this.visibleOwners.size > 0;
   }
 
   whenReady(): Promise<void> {
@@ -128,11 +131,17 @@ export class ViewSession implements vscode.Disposable {
     this.reset();
   }
 
-  setVisible(visible: boolean): void {
-    if (this.visible === visible) return;
-    this.visible = visible;
-    if (!visible) this.releaseAll();
-    else this.changed.fire();
+  /** Hiding `owner` releases only its leases (`<owner>:…`): a hidden tree does not keep watches for a visible table. */
+  setVisible(owner: LeaseOwner, visible: boolean): void {
+    if (this.visibleOwners.has(owner) === visible) return;
+    if (visible) {
+      this.visibleOwners.add(owner);
+      this.changed.fire();
+      return;
+    }
+    this.visibleOwners.delete(owner);
+    for (const key of [...this.owners.keys()]) if (key.startsWith(`${owner}:`)) this.release(key);
+    this.scopedSections.delete(owner);
   }
 
   sections(): SectionDefinition[] {
@@ -161,26 +170,29 @@ export class ViewSession implements vscode.Disposable {
 
   /**
    * Resolve the view's scope (when enabled; once per store change, shared by all sections) and hold leases for the
-   * kinds it needs under `<owner>:scope` while a scoped section of `owner` is open.
+   * kinds it needs under `<owner>:scope` while a scoped section of `owner` is open (unless `hold` is off).
    */
   private activeScope(
     ctx: ClusterContext,
-    owner: string,
+    owner: LeaseOwner,
     sectionId: string,
+    hold: boolean,
   ): { readonly source: ScopeSource; readonly result: ScopeResolution } | undefined {
     const scope = this.registered.scope;
     if (!scope) return undefined;
     const leaseOwner = `${owner}:scope`;
-    const open = this.scopedSections.get(owner) ?? new Set<string>();
-    open.add(sectionId);
-    this.scopedSections.set(owner, open);
+    if (hold) {
+      const open = this.scopedSections.get(owner) ?? new Set<string>();
+      open.add(sectionId);
+      this.scopedSections.set(owner, open);
+    }
     if (!this.scopeEnabled) {
-      this.release(leaseOwner);
+      if (hold) this.release(leaseOwner);
       this.sourceMissing = false;
       return undefined;
     }
     if (scope.context !== ctx.name) {
-      this.release(leaseOwner);
+      if (hold) this.release(leaseOwner);
       return { source: scope.source, result: EMPTY_SCOPE_RESOLUTION };
     }
     const index = this.parentIndex();
@@ -190,19 +202,22 @@ export class ViewSession implements vscode.Disposable {
         ? cached.result
         : resolveScope(scope, this.source.lookup(ctx), index, ctx.scope.type === "all");
     this.scopeCache = { ctx, index, result };
-    this.hold(leaseOwner, result.demands);
+    if (hold) this.hold(leaseOwner, result.demands);
     this.sourceMissing = result.sourceMissing;
     return { source: scope.source, result };
   }
 
-  /** `owner` separates tree and table leases: closing a tree section does not remove the table's data. */
-  openSection(id: string, owner = "tree"): SectionContent {
+  /**
+   * `owner` separates tree and table leases: closing a tree section does not remove the table's data.
+   * `hold: false` acquires nothing and returns what the shared store already has (inactive table tabs).
+   */
+  openSection(id: string, owner: LeaseOwner = "tree", { hold = true }: { hold?: boolean } = {}): SectionContent {
     const section = this.sectionDefinition(id);
     const ctx = this.context;
     if (!section || !ctx) return { state: "ready", items: [], groups: undefined, problems: [] };
     const refs = section.resources.filter((r) => this.kindAvailable.get(kindKey(r)) === true);
     const lookup = this.source.lookup(ctx);
-    const scope = this.activeScope(ctx, owner, id);
+    const scope = this.activeScope(ctx, owner, id, hold);
     const namespace = scope ? scope.source.namespace : section.allNamespaces ? undefined : ctx.namespace;
     /** Scoped sections watch where the scope's resources live; without list permission there, fall back to the source's namespace. */
     const namespacesOf = (ref: KindRef): (string | undefined)[] => {
@@ -221,7 +236,9 @@ export class ViewSession implements vscode.Disposable {
         ? [...list, fallback]
         : list;
     };
-    const metricKinds = section.columns.some((c) => c.usesMetrics)
+    // The tree shows no columns: it needs metrics only to sort by a metric column.
+    const metricColumns = owner === "tree" ? section.columns.filter((c) => c.id === section.sort?.by) : section.columns;
+    const metricKinds = metricColumns.some((c) => c.usesMetrics)
       ? refs.filter((r) => r.group === "" && (r.kind === "Pod" || r.kind === "Node"))
       : [];
     const dependencies = metricKinds.map((r) => ({
@@ -229,10 +246,11 @@ export class ViewSession implements vscode.Disposable {
       namespace: r.kind === "Node" ? undefined : namespace,
     }));
     if (metricKinds.some((r) => r.kind === "Node")) dependencies.push({ group: "", kind: "Pod", namespace: undefined });
-    this.hold(`${owner}:section:${id}`, [
-      ...refs.flatMap((r) => namespacesOf(r).map((ns) => ({ group: r.group, kind: r.kind, namespace: ns }))),
-      ...dependencies,
-    ]);
+    if (hold)
+      this.hold(`${owner}:section:${id}`, [
+        ...refs.flatMap((r) => namespacesOf(r).map((ns) => ({ group: r.group, kind: r.kind, namespace: ns }))),
+        ...dependencies,
+      ]);
     let loading = false;
     const problems: SectionProblem[] = [];
     const items: KubeResource[] = [];
@@ -300,7 +318,7 @@ export class ViewSession implements vscode.Disposable {
     };
   }
 
-  closeSection(id: string, owner = "tree"): void {
+  closeSection(id: string, owner: LeaseOwner = "tree"): void {
     this.release(`${owner}:section:${id}`);
     const open = this.scopedSections.get(owner);
     if (!open?.delete(id) || open.size > 0) return;
