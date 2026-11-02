@@ -142,6 +142,8 @@ export interface SectionPrefs {
   readonly sort?: { readonly id: string; readonly desc: boolean };
   readonly groupBy?: string;
   readonly filter?: string;
+  /** Filter-row expressions by column ID (`>0`, `<1h`, `!=Running`, `a|b`); never written to config files. */
+  readonly columnFilters?: Readonly<Record<string, string>>;
 }
 
 export interface TableViewModel {

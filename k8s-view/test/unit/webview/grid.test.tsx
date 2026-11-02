@@ -141,6 +141,52 @@ describe("ResourceGrid", () => {
     fireEvent.contextMenu(bodyRows()[1]!);
     expect(onContextMenu).toHaveBeenLastCalledWith(["b"]);
   });
+
+  test("filter row expressions filter rows and are stored in prefs", () => {
+    const onPrefs = vi.fn();
+    render(<Harness section={section("deployments", rows)} showFilters onPrefs={onPrefs} />);
+    const ready = screen.getByRole("textbox", { name: "Filter Ready" });
+    fireEvent.change(ready, { target: { value: ">1" } });
+    expect(names()).toEqual(["a"]);
+    expect(onPrefs).toHaveBeenLastCalledWith({ columnFilters: { ready: ">1" } });
+    fireEvent.change(ready, { target: { value: "" } });
+    expect(onPrefs).toHaveBeenLastCalledWith({});
+    expect(names()).toEqual(["a", "b", "c"]);
+  });
+
+  test("column filters still apply while the filter row is hidden, including the status column", () => {
+    render(<Harness section={section("deployments", rows)} prefs={{ columnFilters: { __status: "error" } }} />);
+    expect(names()).toEqual(["b"]);
+  });
+
+  test("invalid expressions are flagged and ignored", () => {
+    render(<Harness section={section("deployments", rows)} showFilters prefs={{ columnFilters: { age: ">soon" } }} />);
+    const input = screen.getByRole("textbox", { name: "Filter Age" });
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.className).toContain("invalid");
+    expect(input.getAttribute("title")).toContain("soon");
+    expect(names()).toEqual(["a", "b", "c"]);
+  });
+
+  test("stale column filter ids are ignored", () => {
+    render(<Harness section={section("deployments", rows)} prefs={{ columnFilters: { removed: "x" } }} />);
+    expect(names()).toEqual(["a", "b", "c"]);
+  });
+
+  test("search qualifiers filter by column and combine with free text", () => {
+    const { unmount } = render(<Harness section={section("deployments", rows)} prefs={{ filter: "ready:>=2" }} />);
+    expect(names()).toEqual(["a"]);
+    unmount();
+    render(<Harness section={section("deployments", rows)} prefs={{ filter: "web ready:>0" }} />);
+    expect(names()).toEqual(["c"]);
+  });
+
+  test("search qualifier and filter row on the same column are AND-ed", () => {
+    render(
+      <Harness section={section("deployments", rows)} prefs={{ filter: "ready:>0", columnFilters: { ready: "<2" } }} />,
+    );
+    expect(names()).toEqual(["c"]);
+  });
 });
 
 test("Pod configuration warning remains visible with hidden resource columns, is searchable, and clears on update", () => {

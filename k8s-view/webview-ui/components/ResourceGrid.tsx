@@ -1,11 +1,5 @@
 // biome-ignore-all lint/a11y/useSemanticElements: div-based ARIA grid because rows are absolutely positioned (virtual scrolling).
-import {
-  type ColumnFiltersState,
-  type ExpandedState,
-  functionalUpdate,
-  type SortingState,
-  useTable,
-} from "@tanstack/react-table";
+import { type ExpandedState, functionalUpdate, type SortingState, useTable } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import * as l10n from "@vscode/l10n";
 import {
@@ -20,7 +14,17 @@ import {
 } from "react";
 import type { SectionPrefs, StatusLevel, TableRow, TableSection } from "../../src/shared/protocol";
 import { useNow } from "../shared/hooks";
-import { buildColumns, COL, FIXED_COLUMNS, features, type GridRow, globalFilter } from "../table/gridColumns";
+import { parseSearch } from "../table/filterExpr";
+import {
+  buildColumns,
+  COL,
+  columnFilterState,
+  FIXED_COLUMNS,
+  features,
+  type GridRow,
+  globalFilter,
+  searchKeyResolver,
+} from "../table/gridColumns";
 import {
   effectiveGroupBy,
   initialColumnOrder,
@@ -91,9 +95,19 @@ export function ResourceGrid(props: ResourceGridProps) {
   const columnSizing = useMemo(() => ({ ...initialSizing(section, prefs), ...prefs.widths }), [section, prefs]);
   const grouping = useMemo(() => (groupBy ? [COL.group] : []), [groupBy]);
 
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const keyOf = useMemo(() => searchKeyResolver(section.columns), [section.columns]);
+  const search = useMemo(() => parseSearch(prefs.filter ?? "", keyOf), [prefs.filter, keyOf]);
+  const columnFilters = useMemo(
+    () => columnFilterState(section.columns, prefs.columnFilters, search.columns, now),
+    [section.columns, prefs.columnFilters, search.columns, now],
+  );
   const [expanded, setExpanded] = useState<ExpandedState>(true);
-  const activeFilters = showFilters ? columnFilters : [];
+  const setColumnFilter = (id: string, value: string) => {
+    const next: Record<string, string> = { ...prefs.columnFilters };
+    if (value === "") delete next[id];
+    else next[id] = value;
+    onPrefsChange(withPref(prefs, "columnFilters", Object.keys(next).length > 0 ? next : undefined));
+  };
 
   const table = useTable({
     features,
@@ -102,8 +116,8 @@ export function ResourceGrid(props: ResourceGridProps) {
     getRowId: (r: TableRow) => r.uid,
     state: {
       sorting,
-      globalFilter: prefs.filter ?? "",
-      columnFilters: activeFilters,
+      globalFilter: search.text,
+      columnFilters,
       grouping,
       expanded,
       columnOrder,
@@ -114,7 +128,6 @@ export function ResourceGrid(props: ResourceGridProps) {
       const s = functionalUpdate(u, sorting)[0];
       onPrefsChange(withPref(prefs, "sort", s ? { id: s.id, desc: s.desc } : undefined));
     },
-    onColumnFiltersChange: (u) => setColumnFilters((old) => functionalUpdate(u, old)),
     onExpandedChange: (u) => setExpanded((old) => functionalUpdate(u, old)),
     onColumnSizingChange: (u) => onPrefsChange(withPref(prefs, "widths", functionalUpdate(u, columnSizing))),
     globalFilterFn: globalFilter,
@@ -346,7 +359,7 @@ export function ResourceGrid(props: ResourceGridProps) {
     }
   };
 
-  const filtered = (prefs.filter ?? "") !== "" || activeFilters.length > 0;
+  const filtered = search.text !== "" || columnFilters.length > 0;
 
   return (
     <div
@@ -372,6 +385,8 @@ export function ResourceGrid(props: ResourceGridProps) {
           onToggleAll={toggleAll}
           onReorder={(order) => onPrefsChange(withPref(prefs, "columnOrder", order))}
           showFilters={showFilters}
+          filters={prefs.columnFilters ?? {}}
+          onFilterChange={setColumnFilter}
         />
       </div>
       <div

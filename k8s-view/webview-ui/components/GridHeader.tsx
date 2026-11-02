@@ -3,7 +3,7 @@ import type { Header } from "@tanstack/react-table";
 import * as l10n from "@vscode/l10n";
 import { type DragEvent, useRef, useState } from "react";
 import type { TableColumn, TableRow } from "../../src/shared/protocol";
-import { COL, columnTitle, type Features, isTextColumn } from "../table/gridColumns";
+import { COL, columnTitle, type Features, filterRender, isFilterableColumn, predicateFor } from "../table/gridColumns";
 import { moveColumn } from "../table/model";
 import { Codicon } from "./Codicon";
 
@@ -26,6 +26,9 @@ export interface GridHeaderProps {
   readonly onToggleAll: () => void;
   readonly onReorder: (order: string[]) => void;
   readonly showFilters: boolean;
+  /** Filter-row expressions by column ID (`SectionPrefs.columnFilters`). */
+  readonly filters: Readonly<Record<string, string>>;
+  readonly onFilterChange: (id: string, value: string) => void;
 }
 
 function ariaSort(h: GridHeaderCell): "ascending" | "descending" | "none" | undefined {
@@ -168,7 +171,9 @@ export function GridHeader(props: GridHeaderProps) {
         <div role="row" className="grid-row filter-row">
           {headers.map((h) => {
             const id = h.column.id;
-            const canFilter = isTextColumn(id) && h.column.getCanFilter();
+            const canFilter = isFilterableColumn(id) && h.column.getCanFilter();
+            const value = props.filters[id] ?? "";
+            const error = value === "" ? undefined : predicateFor(value, filterRender(id, sectionColumns)).error;
             return (
               <div
                 key={h.id}
@@ -180,11 +185,13 @@ export function GridHeader(props: GridHeaderProps) {
                 {canFilter && (
                   <input
                     type="text"
-                    className="input"
+                    className={error ? "input invalid" : "input"}
                     placeholder={l10n.t("Filter")}
                     aria-label={l10n.t("Filter {0}", columnTitle(id, sectionColumns))}
-                    value={String(h.column.getFilterValue() ?? "")}
-                    onChange={(e) => h.column.setFilterValue(e.target.value || undefined)}
+                    aria-invalid={error ? true : undefined}
+                    title={error ?? l10n.t("Text, or >0, <1h, >100%, !=Running, a|b")}
+                    value={value}
+                    onChange={(e) => props.onFilterChange(id, e.target.value)}
                   />
                 )}
               </div>

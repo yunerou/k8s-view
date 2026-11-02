@@ -143,6 +143,12 @@ button {
   outline-offset: -1px;
 }
 
+.input.invalid,
+.input.invalid:focus {
+  outline: 1px solid var(--vscode-inputValidation-errorBorder);
+  outline-offset: -1px;
+}
+
 .count-badge {
   display: inline-block;
   min-width: 18px;

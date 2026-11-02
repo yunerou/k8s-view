@@ -170,6 +170,18 @@ describe("TableApp", () => {
     await screen.findByRole("menu", { name: "Resource actions" });
     expect(requests("table/commandsFor")).toEqual([{ sectionId: "deployments", uids: ["a"] }]);
   });
+
+  test("toolbar flags invalid search qualifiers and active column filters", async () => {
+    setInitialState({
+      viewId: "workload",
+      prefs: { deployments: { filter: "age:>soon", columnFilters: { ready: ">0" } } },
+    } satisfies TableWebviewState);
+    render(<TableApp />);
+    const search = await screen.findByRole("searchbox", { name: "Filter rows" });
+    expect(search.getAttribute("aria-invalid")).toBe("true");
+    const toggle = screen.getByRole("button", { name: "Column filters" });
+    expect(toggle.getAttribute("title")).toBe("1 column filters active");
+  });
 });
 
 describe("TableApp hotkeys", () => {

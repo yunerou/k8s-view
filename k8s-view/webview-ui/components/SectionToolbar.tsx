@@ -1,5 +1,7 @@
 import * as l10n from "@vscode/l10n";
+import { useMemo } from "react";
 import type { SectionPrefs, TableSection } from "../../src/shared/protocol";
+import { searchError } from "../table/gridColumns";
 import { GROUP_NONE, groupByOptions, withPref } from "../table/model";
 import { Codicon } from "./Codicon";
 import { ColumnMenu } from "./ColumnMenu";
@@ -20,6 +22,11 @@ export function SectionToolbar(props: SectionToolbarProps) {
   const groupBy = prefs.groupBy ?? section.groupBy ?? GROUP_NONE;
   const options = groupByOptions(section);
   if (!options.some((o) => o.value === groupBy)) options.push({ value: groupBy, label: groupBy });
+  const activeFilters = Object.keys(prefs.columnFilters ?? {}).length;
+  const searchProblem = useMemo(
+    () => searchError(prefs.filter ?? "", section.columns),
+    [prefs.filter, section.columns],
+  );
 
   return (
     <div className="toolbar" role="toolbar" aria-label={l10n.t("{0} toolbar", section.title)}>
@@ -27,9 +34,11 @@ export function SectionToolbar(props: SectionToolbarProps) {
         <Codicon name="search" />
         <input
           type="search"
-          className="input"
-          placeholder={l10n.t("Filter {0}…", section.title)}
+          className={searchProblem ? "input invalid" : "input"}
+          placeholder={l10n.t("Filter {0}… (e.g. restarts:>0 age:<1h)", section.title)}
           aria-label={l10n.t("Filter rows")}
+          aria-invalid={searchProblem ? true : undefined}
+          title={searchProblem}
           value={prefs.filter ?? ""}
           onChange={(e) => onPrefsChange(withPref(prefs, "filter", e.target.value || undefined))}
         />
@@ -38,10 +47,10 @@ export function SectionToolbar(props: SectionToolbarProps) {
         type="button"
         className="toolbar-button"
         aria-pressed={props.showFilters}
-        title={l10n.t("Toggle column filters")}
+        title={activeFilters > 0 ? l10n.t("{0} column filters active", activeFilters) : l10n.t("Toggle column filters")}
         onClick={props.onToggleFilters}
       >
-        <Codicon name={props.showFilters ? "filter-filled" : "filter"} />
+        <Codicon name={props.showFilters || activeFilters > 0 ? "filter-filled" : "filter"} />
         <span className="sr-only">{l10n.t("Column filters")}</span>
       </button>
       <label className="group-by">
