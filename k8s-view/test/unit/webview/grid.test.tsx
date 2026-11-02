@@ -157,6 +157,9 @@ describe("ResourceGrid", () => {
     fireEvent.change(ready, { target: { value: "" } });
     expect(onPrefs).toHaveBeenLastCalledWith({});
     expect(names()).toEqual(["a", "b", "c"]);
+    fireEvent.change(ready, { target: { value: ">1" } });
+    fireEvent.change(ready, { target: { value: "   " } });
+    expect(onPrefs).toHaveBeenLastCalledWith({});
   });
 
   test("column filters still apply while the filter row is hidden, including the status column", () => {

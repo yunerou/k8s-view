@@ -104,7 +104,7 @@ export function ResourceGrid(props: ResourceGridProps) {
   const [expanded, setExpanded] = useState<ExpandedState>(true);
   const setColumnFilter = (id: string, value: string) => {
     const next: Record<string, string> = { ...prefs.columnFilters };
-    if (value === "") delete next[id];
+    if (value.trim() === "") delete next[id];
     else next[id] = value;
     onPrefsChange(withPref(prefs, "columnFilters", Object.keys(next).length > 0 ? next : undefined));
   };
