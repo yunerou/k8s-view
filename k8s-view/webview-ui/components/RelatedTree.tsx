@@ -9,10 +9,16 @@ import { StatusDot } from "./StatusDot";
 export function RelatedTree({
   nodeKey,
   initial,
+  request: kind = "related",
+  emptyText,
 }: {
   readonly nodeKey: string;
   readonly initial?: readonly RelatedGroup[];
+  /** `parents`: expand through `table/parents` (drawer Parent tab). */
+  readonly request?: "related" | "parents";
+  readonly emptyText?: string;
 }) {
+  const method = kind === "parents" ? TableRequests.parents : TableRequests.related;
   const [groups, setGroups] = useState(initial);
   const [error, setError] = useState<string>();
   const [revision, setRevision] = useState(0);
@@ -25,7 +31,7 @@ export function RelatedTree({
   );
   useEffect(() => {
     let alive = true;
-    request(TableRequests.related, { key: nodeKey }).then(
+    request(method, { key: nodeKey }).then(
       (value) => {
         if (alive) {
           setGroups(value);
@@ -39,7 +45,7 @@ export function RelatedTree({
     return () => {
       alive = false;
     };
-  }, [nodeKey, revision]);
+  }, [method, nodeKey, revision]);
   return (
     <div className="related">
       {error && (
@@ -52,7 +58,7 @@ export function RelatedTree({
           {l10n.t("Loading…")}
         </p>
       )}
-      {groups?.length === 0 && <p className="muted">{l10n.t("No related resources.")}</p>}
+      {groups?.length === 0 && <p className="muted">{emptyText ?? l10n.t("No related resources.")}</p>}
       {groups?.map((group) => (
         <section key={group.key ?? group.title}>
           <h3>{group.title}</h3>
@@ -69,7 +75,11 @@ export function RelatedTree({
           {!group.pending && group.items.length === 0 && <p className="muted">{l10n.t("No related resources.")}</p>}
           <ul>
             {group.items.map((item) => (
-              <RelatedResource key={item.key ?? `${item.kind}/${item.namespace ?? ""}/${item.name}`} item={item} />
+              <RelatedResource
+                key={item.key ?? `${item.kind}/${item.namespace ?? ""}/${item.name}`}
+                item={item}
+                request={kind}
+              />
             ))}
           </ul>
         </section>
@@ -78,7 +88,13 @@ export function RelatedTree({
   );
 }
 
-function RelatedResource({ item }: { readonly item: RelatedItem }) {
+function RelatedResource({
+  item,
+  request: kind,
+}: {
+  readonly item: RelatedItem;
+  readonly request: "related" | "parents";
+}) {
   const [open, setOpen] = useState(false);
   const label = (
     <>
@@ -105,7 +121,7 @@ function RelatedResource({ item }: { readonly item: RelatedItem }) {
           }}
         >
           <summary>{label}</summary>
-          {open && <RelatedTree nodeKey={item.key} />}
+          {open && <RelatedTree nodeKey={item.key} request={kind} />}
         </details>
       ) : (
         <div className="related-leaf">{label}</div>

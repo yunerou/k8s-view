@@ -114,3 +114,60 @@ describe("Documentation", () => {
     expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Browser unavailable");
   });
 });
+
+describe("Parent tab", () => {
+  const parents: RelatedGroup[] = [
+    {
+      key: "table:parents:p1/ReplicaSet",
+      title: "ReplicaSet",
+      items: [
+        {
+          key: "table:parents:p1/rs1",
+          kind: "ReplicaSet",
+          name: "web-1",
+          level: "ok",
+          description: "owner",
+          expandable: true,
+        },
+      ],
+    },
+  ];
+  const grandparents: RelatedGroup[] = [
+    {
+      key: "table:parents:p1/rs1/Deployment",
+      title: "Deployment",
+      items: [{ kind: "Deployment", name: "web", level: "ok" }],
+    },
+  ];
+
+  beforeEach(() => {
+    respond.mockImplementation((method, params) => {
+      if (method === "table/details")
+        return { overview: [], yaml: "", events: [], conditions: [], related: [], parents } satisfies RowDetails;
+      if (method === "table/parents")
+        return (params as { key: string }).key === "table:parents:p1" ? parents : grandparents;
+      return undefined;
+    });
+  });
+
+  test("shows parents with their relation and expands through table/parents", async () => {
+    render(<DetailDrawer sectionId="pods" uid="p1" title="Pod web-1" onClose={vi.fn()} tab="parent" />);
+    expect((await screen.findByRole("tab", { name: /Parent/ })).getAttribute("aria-selected")).toBe("true");
+    expect(await screen.findByText("owner")).toBeTruthy();
+    const details = (await screen.findByText("web-1")).closest("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle", { bubbles: false }));
+    expect(await screen.findByText("web")).toBeTruthy();
+    expect(requests("table/parents")).toContainEqual({ key: "table:parents:p1/rs1" });
+  });
+
+  test("empty parents say so", async () => {
+    respond.mockImplementation((method) =>
+      method === "table/details"
+        ? ({ overview: [], yaml: "", events: [], conditions: [], related: [], parents: [] } satisfies RowDetails)
+        : [],
+    );
+    render(<DetailDrawer sectionId="pods" uid="p1" title="Pod web-1" onClose={vi.fn()} tab="parent" />);
+    expect(await screen.findByText("No parents.")).toBeTruthy();
+  });
+});

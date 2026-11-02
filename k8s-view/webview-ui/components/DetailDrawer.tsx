@@ -9,8 +9,8 @@ import { RelatedTree } from "./RelatedTree";
 import { StatusDot } from "./StatusDot";
 import { Tabs } from "./Tabs";
 
-export type DetailTab = "overview" | "yaml" | "events" | "conditions" | "related";
-const DETAIL_TABS: readonly string[] = ["overview", "yaml", "events", "conditions", "related"];
+export type DetailTab = "overview" | "yaml" | "events" | "conditions" | "related" | "parent";
+const DETAIL_TABS: readonly string[] = ["overview", "yaml", "events", "conditions", "related", "parent"];
 
 export function isDetailTab(v: unknown): v is DetailTab {
   return typeof v === "string" && DETAIL_TABS.includes(v);
@@ -109,6 +109,7 @@ export function DetailDrawer({ sectionId, uid, title, onClose, ...controlled }: 
     { id: "events", label: l10n.t("Events"), count: details?.events.length },
     { id: "conditions", label: l10n.t("Conditions"), count: details?.conditions.length },
     { id: "related", label: l10n.t("Related"), count: details?.related.reduce((n, g) => n + g.items.length, 0) },
+    { id: "parent", label: l10n.t("Parent"), count: details?.parents.reduce((n, g) => n + g.items.length, 0) },
   ];
 
   return (
@@ -257,6 +258,15 @@ export function DetailDrawer({ sectionId, uid, title, onClose, ...controlled }: 
         )}
         {details && tab === "related" && (
           <RelatedTree key={reload} nodeKey={`table:details:${uid}`} initial={details.related} />
+        )}
+        {details && tab === "parent" && (
+          <RelatedTree
+            key={reload}
+            nodeKey={`table:parents:${uid}`}
+            initial={details.parents}
+            request="parents"
+            emptyText={l10n.t("No parents.")}
+          />
         )}
       </div>
     </aside>
