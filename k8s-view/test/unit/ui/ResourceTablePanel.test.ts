@@ -16,9 +16,13 @@ import { FakeResourceSource } from "../helpers/FakeResourceSource";
 import { FakeClusterApi, FakeKubeConfig, FakeSettings, FakeState } from "../helpers/fakes";
 import { kinds, res } from "../helpers/fixtures";
 
-const { handlers, notifications, pick, openExternal, info } = vi.hoisted(() => ({
-  handlers: new Map<string, (params?: unknown) => unknown>(),
+type Handler = (params?: unknown) => unknown;
+const { handlers, byPanel, notifications, sent, pick, openExternal, info } = vi.hoisted(() => ({
+  handlers: new Map<string, Handler>(),
+  /** Request handlers of each table tab (keyed by its webview panel). */
+  byPanel: new Map<unknown, Map<string, Handler>>(),
   notifications: [] as string[],
+  sent: [] as { method: string; panel: unknown }[],
   pick: vi.fn(),
   openExternal: vi.fn(async () => true),
   info: vi.fn(),
@@ -33,15 +37,21 @@ vi.mock("vscode", async (original) => ({
 }));
 vi.mock("vscode-messenger", () => ({
   Messenger: class {
-    registerWebviewPanel() {
-      return {};
+    private panel: unknown;
+    registerWebviewPanel(p: unknown) {
+      this.panel = p;
+      return { panel: p };
     }
-    onRequest(type: { method: string }, handler: (params?: unknown) => unknown) {
+    onRequest(type: { method: string }, handler: Handler) {
       handlers.set(type.method, handler);
+      const own = byPanel.get(this.panel) ?? new Map<string, Handler>();
+      own.set(type.method, handler);
+      byPanel.set(this.panel, own);
       return { dispose() {} };
     }
-    sendNotification(type: { method: string }) {
+    sendNotification(type: { method: string }, participant?: { panel: unknown }) {
       notifications.push(type.method);
+      sent.push({ method: type.method, panel: participant?.panel });
     }
   },
 }));
@@ -64,9 +74,24 @@ async function request<T>(method: string, params?: unknown): Promise<T> {
   return (await handlers.get(`table/${method}`)!(params)) as T;
 }
 
+function makePanel(): vscode.WebviewPanel {
+  return {
+    visible: true,
+    active: true,
+    title: "Table",
+    reveal() {},
+    dispose: vi.fn(),
+    webview: { html: "", cspSource: "test", asWebviewUri: (uri: vscode.Uri) => uri },
+    onDidChangeViewState: new vscode.EventEmitter<vscode.WebviewPanelOnDidChangeViewStateEvent>().event,
+    onDidDispose: new vscode.EventEmitter<void>().event,
+  } as unknown as vscode.WebviewPanel;
+}
+
 beforeEach(async () => {
   handlers.clear();
+  byPanel.clear();
   notifications.length = 0;
+  sent.length = 0;
   execute.mockClear();
   pick.mockReset();
   openExternal.mockClear();
@@ -147,16 +172,7 @@ beforeEach(async () => {
   commands.apply(files, ctx, new Map());
   sessions = new ViewSessionManager(registry, contexts, source, settings);
   await sessions.session("workload")!.whenReady();
-  panel = {
-    visible: true,
-    active: true,
-    title: "Table",
-    reveal() {},
-    dispose: vi.fn(),
-    webview: { html: "", cspSource: "test", asWebviewUri: (uri: vscode.Uri) => uri },
-    onDidChangeViewState: new vscode.EventEmitter<vscode.WebviewPanelOnDidChangeViewStateEvent>().event,
-    onDidDispose: new vscode.EventEmitter<void>().event,
-  } as unknown as vscode.WebviewPanel;
+  panel = makePanel();
   scoped = new ScopedViewService(registry, contexts, source);
   manifestsOpen = vi.fn(async () => undefined);
   tables = new ResourceTablePanels(
@@ -388,6 +404,30 @@ describe("scoped tabs", () => {
     await openRelated();
     scoped.clear();
     expect(panel.dispose).toHaveBeenCalled();
+  });
+
+  test("namespace change keeps scoped tabs", async () => {
+    await openRelated();
+    await contexts.selectNamespace({ type: "single", name: "b" });
+    expect(panel.dispose).not.toHaveBeenCalled();
+    expect(sessions.session(`related.${deployment.uid}`)).toBeDefined();
+  });
+
+  test("opening and closing a scoped tab leaves other tables and their open drawers alone", async () => {
+    const workloadPanel = panel;
+    const workload = byPanel.get(workloadPanel)!;
+    source.set({ group: "", kind: "Pod" }, "a", [ownedPod()]);
+    await workload.get("table/details")!({ sectionId: "deployments", uid: deployment.uid });
+    panel = makePanel();
+    sent.length = 0;
+    expect(
+      await workload.get("table/openScoped")!({ sectionId: "deployments", uid: deployment.uid, direction: "related" }),
+    ).toBe(true);
+    expect(byPanel.has(panel)).toBe(true);
+    scoped.remove(`related.${deployment.uid}`);
+    expect(sent.filter((n) => n.panel === workloadPanel && n.method === "table/reset")).toEqual([]);
+    expect(workloadPanel.dispose).not.toHaveBeenCalled();
+    expect(((await workload.get("table/related")!({ key: rootKey })) as RelatedGroup[])[0]!.items).toHaveLength(1);
   });
 
   test("restores a scoped tab from webview state only in its context", async () => {

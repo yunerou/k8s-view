@@ -193,6 +193,27 @@ describe("TableApp", () => {
     );
   });
 
+  test("a reset reloads the open drawer (same tab) and closes it when its row is gone", async () => {
+    render(<TableApp />);
+    await screen.findByRole("tab", { name: /Deployments/ });
+    openRow("a");
+    let drawer = await screen.findByRole("complementary", { name: /Details of Deployment default\/a/ });
+    await within(drawer).findByText("Replicas");
+    fireEvent.click(within(drawer).getByRole("tab", { name: /Events/ }));
+    act(() => notify("table/reset", vm));
+    await waitFor(() => expect(requests("table/details")).toHaveLength(2));
+    drawer = await screen.findByRole("complementary", { name: /Details of Deployment default\/a/ });
+    expect(
+      within(drawer)
+        .getByRole("tab", { name: /Events/ })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    expect(await within(drawer).findByText("BackOff")).toBeTruthy();
+    act(() => notify("table/reset", model([section("deployments", [row("b")])])));
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(requests("table/details")).toHaveLength(2);
+  });
+
   test("restores the drawer tab from webview state", async () => {
     setInitialState({ viewId: "workload", prefs: {}, drawerTab: "yaml" } satisfies TableWebviewState);
     render(<TableApp />);

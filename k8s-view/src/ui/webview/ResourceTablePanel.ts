@@ -11,6 +11,7 @@ import { Settings } from "../../app/ports/Settings";
 import { StateStore } from "../../app/ports/StateStore";
 import { ScopedViewService } from "../../app/ScopedViewService";
 import { buildSection, diffSection, EMPTY_SNAPSHOT, type SectionSnapshot } from "../../app/TableModel";
+import type { RegisteredView } from "../../app/ViewRegistry";
 import type { ViewSession } from "../../app/ViewSession";
 import { ViewSessionManager } from "../../app/ViewSessionManager";
 import { formatAge } from "../../core/resource/format";
@@ -207,7 +208,6 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
       writer: this.writer,
       manifests: this.manifests,
       hotkeys: this.hotkeys,
-      scoped: this.scoped,
     };
   }
 }
@@ -221,6 +221,11 @@ class TablePanel implements vscode.Disposable {
   private detailsKey: string | undefined;
   private parentsKey: string | undefined;
   private scopeKey = "";
+  /** Session and view the tab last reset for: other views' changes leave the tab (and its drawer) untouched. */
+  private bound: { session: ViewSession | undefined; view: RegisteredView | undefined } = {
+    session: undefined,
+    view: undefined,
+  };
   private readonly parentNodes = new Map<string, KubeResource>();
   private readonly relatedNodes = new Map<string, { resource: KubeResource; children: readonly ChildDefinition[] }>();
   private dirty = false;
@@ -319,8 +324,12 @@ class TablePanel implements vscode.Disposable {
       ),
       panel.onDidChangeViewState(() => this.visibilityChanged()),
       d.contexts.onDidChange(() => this.reset()),
-      d.sessions.onDidChangeSessions(() => this.reset()),
+      d.sessions.onDidChangeSessions(() => {
+        const session = this.session;
+        if (session !== this.bound.session || session?.view !== this.bound.view) this.reset();
+      }),
     );
+    this.bind();
     this.subscribeSession();
     this.visibilityChanged();
   }
@@ -406,6 +415,11 @@ class TablePanel implements vscode.Disposable {
 
   private sessionSubscription: vscode.Disposable | undefined;
 
+  private bind(): void {
+    const session = this.session;
+    this.bound = { session, view: session?.view };
+  }
+
   private subscribeSession(): void {
     this.sessionSubscription?.dispose();
     const session = this.session;
@@ -467,6 +481,7 @@ class TablePanel implements vscode.Disposable {
       return;
     }
     this.closeDetails();
+    this.bind();
     this.subscribeSession();
     const session = this.session;
     if (session) this.panel.title = `${session.definition.title} · table`;

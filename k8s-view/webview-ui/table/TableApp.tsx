@@ -60,6 +60,8 @@ export function TableApp() {
   const savedTab = saved?.drawerTab;
   const [drawerTab, setDrawerTab] = useState<DetailTab>(isDetailTab(savedTab) ? savedTab : "overview");
   const [drawerWidth, setDrawerWidth] = useState<number>();
+  /** Bumped on reset: the extension drops drawer state then, so the open drawer reloads its details. */
+  const [drawerEpoch, setDrawerEpoch] = useState(0);
   const grid = useRef<GridHandle>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const viewId = useRef(saved?.viewId);
@@ -85,6 +87,10 @@ export function TableApp() {
     adopt(m);
     setSelection(new Set());
     setMenu(undefined);
+    setDrawer((d) =>
+      d && m.sections.some((s) => s.id === d.sectionId && s.rows.some((r) => r.uid === d.uid)) ? d : undefined,
+    );
+    setDrawerEpoch((e) => e + 1);
   });
 
   useNotification(TableNotifications.patch, (p) => {
@@ -306,7 +312,7 @@ export function TableApp() {
           />
           {drawer && (
             <DetailDrawer
-              key={`${drawer.sectionId}/${drawer.uid}`}
+              key={`${drawer.sectionId}/${drawer.uid}/${drawerEpoch}`}
               sectionId={drawer.sectionId}
               uid={drawer.uid}
               title={
