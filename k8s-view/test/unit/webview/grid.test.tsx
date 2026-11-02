@@ -55,15 +55,19 @@ describe("ResourceGrid", () => {
     expect(grid.getAttribute("aria-rowcount")).toBe("4");
     expect(names()).toEqual(["a", "b", "c"]);
     const headers = screen.getAllByRole("columnheader").map((h) => h.textContent);
-    expect(headers).toEqual(expect.arrayContaining(["Name", "Namespace", "Ready", "Phase", "Age"]));
+    expect(headers).toEqual(expect.arrayContaining(["Name", "Ready", "Phase", "Age"]));
+    expect(headers).not.toContain("Namespace");
     expect(headers).not.toContain("Images");
     expect(bodyRows()[1]!.className).toContain("flash");
     expect(within(bodyRows()[1]!).getAllByRole("img", { name: "Error" })).toHaveLength(2);
   });
 
-  test("hides the namespace column when showNamespace is false", () => {
-    render(<Harness section={section("deployments", rows, { showNamespace: false })} />);
-    expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).not.toContain("Namespace");
+  test("shows the namespace column when enabled, including a single namespace scope", () => {
+    render(
+      <Harness section={section("deployments", rows, { showNamespace: false })} prefs={{ namespaceVisible: true }} />,
+    );
+    expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).toContain("Namespace");
+    expect(within(bodyRows()[1]!).getByText("team-b")).toBeTruthy();
   });
 
   test("sorts by cell.sort with nulls last in both directions", () => {
@@ -91,7 +95,7 @@ describe("ResourceGrid", () => {
     render(<Harness section={section("deployments", rows)} prefs={{ filter: "app=web" }} />);
     expect(names()).toEqual(["c"]);
     cleanup();
-    render(<Harness section={section("deployments", rows)} showFilters />);
+    render(<Harness section={section("deployments", rows)} prefs={{ namespaceVisible: true }} showFilters />);
     fireEvent.change(screen.getByRole("textbox", { name: "Filter Namespace" }), { target: { value: "team-b" } });
     expect(names()).toEqual(["b"]);
   });

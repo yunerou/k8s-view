@@ -134,6 +134,8 @@ export interface TableSection {
 
 /** Table preferences per section, stored per view (workspaceState) and optionally written back to JSON. */
 export interface SectionPrefs {
+  /** Visibility of the implicit Namespace column; hidden by default. */
+  readonly namespaceVisible?: boolean;
   readonly columnOrder?: readonly string[];
   readonly hidden?: readonly string[];
   readonly widths?: Readonly<Record<string, number>>;
@@ -215,6 +217,8 @@ export interface RelatedItem {
 }
 
 export interface RowDetails {
+  /** Official concept guide; not tied to the cluster's Kubernetes version. */
+  readonly documentation?: { readonly kind: string; readonly url: string };
   readonly overview: readonly { readonly label: string; readonly value: string }[];
   readonly yaml: string;
   readonly events: readonly EventInfo[];
@@ -239,6 +243,7 @@ export const TableRequests = {
     "ok" | "cancelled" | "blocked" | "failed"
   >,
   details: { method: "table/details" } as RequestType<RowRef, RowDetails>,
+  openDocumentation: { method: "table/openDocumentation" } as RequestType<RowRef, void>,
   related: { method: "table/related" } as RequestType<{ key: string }, readonly RelatedGroup[]>,
   closeRelated: { method: "table/closeRelated" } as RequestType<{ key: string; dispose?: boolean }, void>,
   openManifest: { method: "table/openManifest" } as RequestType<RowRef, void>,

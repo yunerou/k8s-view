@@ -132,6 +132,37 @@ describe("TableApp", () => {
     expect(screen.getAllByRole("columnheader").map((h) => h.textContent)).not.toContain("Phase");
   });
 
+  test("Namespace is hidden by default, can be toggled and saved, and resets to hidden", async () => {
+    render(<TableApp />);
+    await screen.findByRole("tab", { name: /Deployments/ });
+    expect(screen.queryByRole("columnheader", { name: /Namespace/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Columns" }));
+    const namespace = screen.getByRole("menuitemcheckbox", { name: "Namespace" });
+    expect(namespace.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(namespace);
+    expect(screen.getByRole("columnheader", { name: /Namespace/ })).toBeTruthy();
+    expect(namespace.getAttribute("aria-checked")).toBe("true");
+    await waitFor(() =>
+      expect(requests("table/savePrefs")).toEqual([{ sectionId: "deployments", prefs: { namespaceVisible: true } }]),
+    );
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Phase" }));
+    expect(screen.getByRole("columnheader", { name: /Namespace/ })).toBeTruthy();
+    fireEvent.click(namespace);
+    expect(screen.queryByRole("columnheader", { name: /Namespace/ })).toBeNull();
+    fireEvent.click(namespace);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Reset columns" }));
+    expect(screen.queryByRole("columnheader", { name: /Namespace/ })).toBeNull();
+  });
+
+  test("restores Namespace visibility from saved preferences", async () => {
+    setInitialState({
+      viewId: "workload",
+      prefs: { deployments: { namespaceVisible: true } },
+    } satisfies TableWebviewState);
+    render(<TableApp />);
+    expect(await screen.findByRole("columnheader", { name: /Namespace/ })).toBeTruthy();
+  });
+
   test("right-click opens the context menu for the row", async () => {
     render(<TableApp />);
     await screen.findByRole("tab", { name: /Deployments/ });

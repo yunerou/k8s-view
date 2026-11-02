@@ -4,6 +4,19 @@ All notable changes to K8s View are documented here. The project follows
 [Conventional Commits](https://www.conventionalcommits.org/); odd minor versions (0.1.x) are pre-releases,
 even minor versions (0.2.x) are stable.
 
+## [Unreleased]
+
+### Added
+
+- Official Kubernetes documentation links in the detail drawer Overview for common built-in resource kinds.
+
+### Fixed
+
+- Show **Delete** for every resource kind, including custom and cluster-scoped resources, for both single
+  and mixed multi-selections. Batch deletion uses each selected object's API path and UID precondition.
+- Single-resource deletion uses the discovered plural and API group through `${kubectlName}` to avoid
+  ambiguity between kinds with the same name.
+
 
 ## [0.0.3] Fixed
 

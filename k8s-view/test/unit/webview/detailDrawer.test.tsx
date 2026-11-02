@@ -71,3 +71,38 @@ describe("Related resources", () => {
     expect(requests("table/closeRelated")).toContainEqual({ key: "table:details:p1", dispose: true });
   });
 });
+
+describe("Documentation", () => {
+  const documentation = {
+    kind: "Deployment",
+    url: "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+  };
+
+  test("shows the official guide and asks the extension to open it", async () => {
+    respond.mockResolvedValue({ overview: [], yaml: "", events: [], conditions: [], related: [], documentation });
+    render(<DetailDrawer sectionId="deployments" uid="d1" title="Deployment web" onClose={vi.fn()} />);
+    const link = await screen.findByRole("link", { name: "Deployment guide" });
+    expect(link.getAttribute("href")).toBe(documentation.url);
+    fireEvent.click(link);
+    expect(requests("table/openDocumentation")).toEqual([{ sectionId: "deployments", uid: "d1" }]);
+  });
+
+  test("omits documentation when the resource has no curated guide", async () => {
+    render(<DetailDrawer sectionId="custom" uid="c1" title="Custom resource" onClose={vi.fn()} />);
+    await screen.findByRole("tabpanel");
+    await vi.waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    expect(screen.queryByText("Documentation")).toBeNull();
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  test("reports browser-opening failures", async () => {
+    respond.mockImplementation((method) => {
+      if (method === "table/details")
+        return { overview: [], yaml: "", events: [], conditions: [], related: [], documentation };
+      if (method === "table/openDocumentation") throw new Error("Browser unavailable");
+    });
+    render(<DetailDrawer sectionId="deployments" uid="d1" title="Deployment web" onClose={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("link", { name: "Deployment guide" }));
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Browser unavailable");
+  });
+});

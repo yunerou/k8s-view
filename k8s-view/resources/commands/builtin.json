@@ -282,11 +282,19 @@
       "multi": "sequential",
       "refreshAfter": true,
       "confirm": "Delete ${kind} ${namespace}/${name} on ${context}?",
-      "match": [{ "group": "", "kind": "Pod" }, { "group": "batch", "kind": "Job" }],
+      "match": [{ "group": "*", "kind": "*" }],
       "run": {
         "type": "process",
         "command": "kubectl",
-        "args": ["delete", "${kindLower}", "${name}", "-n", "${namespace}", "--context", "${context}", "--wait=false"]
+        "args": [
+          "delete",
+          "${kubectlName}",
+          "${name}",
+          "--namespace=${namespace}",
+          "--context",
+          "${context}",
+          "--wait=false"
+        ]
       }
     },
     {

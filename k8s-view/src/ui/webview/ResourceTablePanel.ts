@@ -14,6 +14,7 @@ import type { ViewSession } from "../../app/ViewSession";
 import { ViewSessionManager } from "../../app/ViewSessionManager";
 import { formatAge } from "../../core/resource/format";
 import type { KubeResource } from "../../core/resource/KubeResource";
+import { resourceDocumentation } from "../../core/resource/resourceDocumentation";
 import type { ChildDefinition } from "../../core/view/ViewDefinition";
 import { EXTENSION_CONTEXT } from "../../di/tokens";
 import type { HotkeyAction } from "../../shared/hotkeys";
@@ -177,6 +178,11 @@ class TablePanel implements vscode.Disposable {
         return d.executor.execute(command, this.resolve(sectionId, uids));
       }),
       m.onRequest(TableRequests.details, (ref) => this.details(ref)),
+      m.onRequest(TableRequests.openDocumentation, async (ref) => {
+        const [resource] = this.resolve(ref.sectionId, [ref.uid]);
+        const url = resource && resourceDocumentation(resource.kind);
+        if (url) await vscode.env.openExternal(vscode.Uri.parse(url));
+      }),
       m.onRequest(TableRequests.related, ({ key }) => this.related(key)),
       m.onRequest(TableRequests.closeRelated, ({ key, dispose }) => {
         if (dispose && key === this.detailsKey) this.closeDetails();
@@ -565,7 +571,9 @@ class TablePanel implements vscode.Disposable {
     } catch {
       // No permission to read events: skip.
     }
+    const documentationUrl = resourceDocumentation(r.kind);
     return {
+      ...(documentationUrl ? { documentation: { kind: r.kind.kind, url: documentationUrl } } : {}),
       overview,
       yaml: stringify(r.object, { lineWidth: 0 }),
       events,

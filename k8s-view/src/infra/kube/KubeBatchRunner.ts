@@ -57,7 +57,7 @@ export class KubeBatchRunner extends BatchRunner {
 function validate(run: BatchRun, r: KubeResource): void {
   const supported: Record<BatchRun["operation"], readonly string[]> = {
     copyNames: [],
-    delete: ["/Pod", "batch/Job"],
+    delete: [], // Every discovered kind can be deleted by its item path.
     restart: ["apps/Deployment", "apps/StatefulSet", "apps/DaemonSet"],
     scale: ["apps/Deployment", "apps/StatefulSet", "apps/ReplicaSet", "/ReplicationController"],
     suspend: ["batch/CronJob", "batch/Job"],
@@ -66,7 +66,7 @@ function validate(run: BatchRun, r: KubeResource): void {
     cordon: ["/Node"],
     uncordon: ["/Node"],
   };
-  if (!supported[run.operation].includes(r.kind.key))
+  if (run.operation !== "delete" && !supported[run.operation].includes(r.kind.key))
     throw new Error(`${run.operation} is not supported for ${r.kind.kind}`);
   if (!r.uid || (r.kind.namespaced && !r.namespace)) throw new Error(`Missing resource identity for ${r.name}`);
   if (

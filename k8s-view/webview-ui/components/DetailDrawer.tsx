@@ -50,6 +50,7 @@ export function DetailDrawer({ sectionId, uid, title, onClose }: DetailDrawerPro
   useEffect(() => {
     let alive = true;
     setError(undefined);
+    setDetails(undefined);
     request(TableRequests.details, { sectionId, uid }).then(
       (d) => alive && setDetails(d),
       (e: unknown) => alive && setError(errorMessage(e)),
@@ -170,6 +171,25 @@ export function DetailDrawer({ sectionId, uid, title, onClose }: DetailDrawerPro
         )}
         {details && tab === "overview" && (
           <dl className="overview">
+            {details.documentation && (
+              <div className="overview-item">
+                <dt>{l10n.t("Documentation")}</dt>
+                <dd>
+                  <a
+                    href={details.documentation.url}
+                    title={l10n.t("Open official Kubernetes documentation in browser")}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      void request(TableRequests.openDocumentation, { sectionId, uid }).catch((e: unknown) =>
+                        setError(errorMessage(e)),
+                      );
+                    }}
+                  >
+                    {l10n.t("{0} guide", details.documentation.kind)} <Codicon name="link-external" />
+                  </a>
+                </dd>
+              </div>
+            )}
             {details.overview.map((o) => (
               <div key={o.label} className="overview-item">
                 <dt>{o.label}</dt>

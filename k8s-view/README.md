@@ -49,7 +49,7 @@ Double-click a table row to open its details alongside the list:
 
 | Tab | What you can check |
 | --- | --- |
-| **Overview** | Identity, readiness, age and labels |
+| **Overview** | Identity, readiness, age, labels and official documentation for supported Kubernetes kinds |
 | **YAML** | The resource manifest |
 | **Events** | Events associated with the resource |
 | **Conditions** | Status, reasons and messages reported by Kubernetes or a controller |

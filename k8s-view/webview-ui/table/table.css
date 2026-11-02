@@ -402,6 +402,14 @@ body {
   overflow-wrap: anywhere;
 }
 
+.overview a {
+  color: var(--vscode-textLink-foreground);
+}
+
+.overview a:hover {
+  color: var(--vscode-textLink-activeForeground);
+}
+
 .yaml {
   margin: 0;
   padding: 8px;

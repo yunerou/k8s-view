@@ -7,6 +7,7 @@ export const RESOURCE_VARIABLES = [
   "namespace",
   "kind",
   "kindLower",
+  "kubectlName",
   "group",
   "apiVersion",
   "plural",
@@ -40,6 +41,8 @@ export function resourceVariable(r: KubeResource, name: string, arg: string | un
       return r.kind.kind;
     case "kindLower":
       return r.kind.kind.toLowerCase();
+    case "kubectlName":
+      return r.kind.kubectlName;
     case "group":
       return r.kind.group;
     case "apiVersion":

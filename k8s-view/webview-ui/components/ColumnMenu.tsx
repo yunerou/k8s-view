@@ -41,7 +41,8 @@ export function ColumnMenu({
     );
   };
   const reset = () => {
-    let next = withPref(prefs, "hidden", undefined);
+    let next = withPref(prefs, "namespaceVisible", undefined);
+    next = withPref(next, "hidden", undefined);
     next = withPref(next, "columnOrder", undefined);
     onPrefsChange(withPref(next, "widths", undefined));
   };
@@ -74,6 +75,17 @@ export function ColumnMenu({
       </button>
       {open && (
         <div className="popover menu" role="menu" aria-label={l10n.t("Columns")} onKeyDown={onKeyDown}>
+          <button
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={prefs.namespaceVisible ?? false}
+            className="menu-item"
+            tabIndex={-1}
+            onClick={() => onPrefsChange(withPref(prefs, "namespaceVisible", !prefs.namespaceVisible))}
+          >
+            <Codicon name={prefs.namespaceVisible ? "check" : "blank"} />
+            <span className="menu-title">{l10n.t("Namespace")}</span>
+          </button>
           {order.map((id) => {
             const col = section.columns.find((c) => c.id === id);
             if (!col) return null;

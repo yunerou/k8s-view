@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { CancellationTokenSource } from "vscode";
+import { ResourceKind } from "../../../src/core/resource/ResourceKind";
 import { KubeBatchRunner } from "../../../src/infra/kube/KubeBatchRunner";
 import type { KubeHttp } from "../../../src/infra/kube/KubeHttp";
 import { kinds, res } from "../helpers/fixtures";
@@ -51,6 +52,46 @@ describe("KubeBatchRunner", () => {
       expect.any(AbortSignal),
     );
   });
+
+  test("deletes a mixed selection of built-in, custom and cluster-scoped resources by exact API path", async () => {
+    const { runner, mutate, cancellation } = setup();
+    const targets = [
+      res(kinds.configMap, "settings", {}, "team-a"),
+      res(kinds.deployment, "web", {}, "team-b"),
+      res(kinds.namespace, "old-team"),
+      res(new ResourceKind("example.io", "v1", "Policy", "policies", true), "rules", {}, "team-a"),
+      res(new ResourceKind("other.io", "v1beta1", "Policy", "policies", false), "rules"),
+    ];
+    expect(await runner.run("dev", { type: "batch", operation: "delete" }, targets, cancellation.token)).toEqual({
+      succeeded: targets.length,
+      failures: [],
+      cancelled: false,
+    });
+    expect(mutate.mock.calls.map((c) => c.slice(0, 4))).toEqual(
+      targets.map((r) => [
+        "dev",
+        r.kind.itemPath(r.namespace, r.name),
+        "DELETE",
+        { apiVersion: "v1", kind: "DeleteOptions", preconditions: { uid: r.uid }, propagationPolicy: "Background" },
+      ]),
+    );
+  });
+
+  test.each([{ uid: "" }, { namespace: "" }])(
+    "delete validates resource identity before any writes: %o",
+    async (metadata) => {
+      const { runner, mutate, cancellation } = setup();
+      await expect(
+        runner.run(
+          "dev",
+          { type: "batch", operation: "delete" },
+          [...pods, res(kinds.configMap, "invalid", { metadata: { name: "invalid", uid: "uid", ...metadata } })],
+          cancellation.token,
+        ),
+      ).rejects.toThrow("Missing resource identity");
+      expect(mutate).not.toHaveBeenCalled();
+    },
+  );
 
   test("restart uses the same annotation timestamp for the whole selection", async () => {
     const { runner, mutate, cancellation } = setup();
@@ -124,8 +165,8 @@ describe("KubeBatchRunner", () => {
     await expect(
       runner.run(
         "dev",
-        { type: "batch", operation: "delete" },
-        [...pods, res(kinds.deployment, "web")],
+        { type: "batch", operation: "restart" },
+        [res(kinds.deployment, "web"), ...pods],
         cancellation.token,
       ),
     ).rejects.toThrow("not supported");

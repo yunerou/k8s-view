@@ -83,7 +83,7 @@ export function ResourceGrid(props: ResourceGridProps) {
   const columnVisibility = useMemo(
     () => ({
       ...initialVisibility(section, prefs),
-      [COL.namespace]: section.showNamespace,
+      [COL.namespace]: prefs.namespaceVisible ?? false,
       [COL.group]: false,
     }),
     [section, prefs],

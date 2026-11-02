@@ -27,12 +27,8 @@
       "icon": "trash",
       "match": [
         {
-          "group": "",
-          "kind": "Pod"
-        },
-        {
-          "group": "batch",
-          "kind": "Job"
+          "group": "*",
+          "kind": "*"
         }
       ],
       "dangerous": true,

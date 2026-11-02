@@ -2,12 +2,13 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { compileCommand } from "../../../src/core/command/CommandDefinition";
+import { renderRun } from "../../../src/core/command/CommandTemplate";
 import { parseConfigText } from "../../../src/core/config/parseConfig";
 import type { CommandConfig, ViewConfig } from "../../../src/core/config/schema";
 import { ExpressionEngine } from "../../../src/core/expression/ExpressionEngine";
 import { ResourceKind } from "../../../src/core/resource/ResourceKind";
 import { compileView } from "../../../src/core/view/ViewDefinition";
-import { res } from "../helpers/fixtures";
+import { kinds, res } from "../helpers/fixtures";
 
 const root = join(__dirname, "../../../resources");
 const files = ["views", "commands", "presets"].flatMap((dir) =>
@@ -150,6 +151,54 @@ describe("built-in and preset config files", () => {
       "node.drain",
     ]) {
       expect(byId.get(id)?.dangerous, id).toBe(true);
+    }
+  });
+
+  test.each([
+    ...Object.values(kinds),
+    new ResourceKind("example.io", "v1", "Policy", "policies", true),
+    new ResourceKind("other.io", "v1", "Policy", "policies", false),
+  ])("single and batch Delete apply to $key with an unambiguous kubectl resource name", (kind) => {
+    const target = res(kind, "selected");
+    for (const [file, id] of [
+      ["builtin.json", "k8s.delete"],
+      ["batch.json", "batch.delete"],
+    ] as const) {
+      const parsed = parseConfigText(readFileSync(join(root, "commands", file), "utf8"));
+      const config = parsed.commands.find((c) => (c.config as CommandConfig).id === id)!.config as CommandConfig;
+      const command = compileCommand(config, "builtin", engine).command!;
+      expect(command.matches(target)).toBe(true);
+      expect(command.dangerous).toBe(true);
+      expect(command.refreshAfter).toBe(true);
+      if (id === "k8s.delete") {
+        expect(command.multi).toBe("sequential");
+        expect(
+          renderRun(command, target, {
+            context: "dev",
+            cluster: "dev",
+            user: "admin",
+            kubeconfig: "",
+            timestamp: "",
+            workspaceFolder: undefined,
+            namespace: "unrelated",
+            inputs: {},
+          }),
+        ).toMatchObject({
+          type: "process",
+          command: "kubectl",
+          args: [
+            "delete",
+            kind.group ? `${kind.plural}.${kind.group}` : kind.plural,
+            "selected",
+            `--namespace=${target.namespace ?? ""}`,
+            "--context",
+            "dev",
+            "--wait=false",
+          ],
+        });
+      } else {
+        expect(command.isBatch).toBe(true);
+      }
     }
   });
 });

@@ -15,14 +15,16 @@ import { FakeResourceSource } from "../helpers/FakeResourceSource";
 import { FakeClusterApi, FakeKubeConfig, FakeSettings, FakeState } from "../helpers/fakes";
 import { kinds, res } from "../helpers/fixtures";
 
-const { handlers, notifications, pick } = vi.hoisted(() => ({
+const { handlers, notifications, pick, openExternal } = vi.hoisted(() => ({
   handlers: new Map<string, (params?: unknown) => unknown>(),
   notifications: [] as string[],
   pick: vi.fn(),
+  openExternal: vi.fn(async () => true),
 }));
 let panel: vscode.WebviewPanel;
 vi.mock("vscode", async (original) => ({
   ...(await original<typeof import("vscode")>()),
+  env: { openExternal },
   ViewColumn: { Active: -1 },
   QuickPickItemKind: { Separator: -1, Default: 0 },
   window: { createWebviewPanel: () => panel, showQuickPick: pick },
@@ -61,6 +63,7 @@ beforeEach(async () => {
   notifications.length = 0;
   execute.mockClear();
   pick.mockReset();
+  openExternal.mockClear();
   const state = new FakeState();
   const settings = new FakeSettings();
   contexts = new ContextService(
@@ -177,6 +180,19 @@ describe("table commands and related tree", () => {
     expect(await request("runCommand", { ...selection, commandId: "manifest" })).toBe("blocked");
     expect(await request("commandsFor", { ...selection, uids: [deployment.uid, "missing"] })).toEqual([]);
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  test("opens the selected resource's curated guide and ignores missing resources", async () => {
+    const ref = { sectionId: "deployments", uid: deployment.uid };
+    const details = await request<RowDetails>("details", ref);
+    expect(details.documentation).toEqual({
+      kind: "Deployment",
+      url: "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/",
+    });
+    await request("openDocumentation", { ...ref, url: "https://untrusted.example/" });
+    expect(openExternal).toHaveBeenCalledWith(vscode.Uri.parse(details.documentation!.url));
+    await request("openDocumentation", { ...ref, uid: "missing" });
+    expect(openExternal).toHaveBeenCalledTimes(1);
   });
 
   test("related children expand recursively and closing the root releases their watches", async () => {

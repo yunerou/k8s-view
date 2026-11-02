@@ -3,7 +3,7 @@
     "displayName": "K8s View",
     "description": "Custom Kubernetes views with auto refresh, resource-bound commands, colored multi-pod logs and parameterized snippets, defined in JSON.",
     "publisher": "yunerou",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "private": true,
     "license": "MIT",
     "icon": "resources/icons/k8s-view.png",

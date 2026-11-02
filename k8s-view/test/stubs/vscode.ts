@@ -303,6 +303,9 @@ export const window = {
 };
 
 export const env = {
+  async openExternal(_target: Uri): Promise<boolean> {
+    return true;
+  },
   clipboard: {
     text: "",
     async writeText(v: string): Promise<void> {
