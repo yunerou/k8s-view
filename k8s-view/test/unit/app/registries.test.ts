@@ -9,6 +9,7 @@ import { ViewRegistry } from "../../../src/app/ViewRegistry";
 import { CommandAllowlist } from "../../../src/core/command/allowlist";
 import type { ConfigOrigin } from "../../../src/core/config/origin";
 import { parseConfigText } from "../../../src/core/config/parseConfig";
+import { ViewSchema } from "../../../src/core/config/schema";
 import { FakeSettings, FakeState } from "../helpers/fakes";
 import { kinds, res } from "../helpers/fixtures";
 
@@ -87,6 +88,25 @@ describe("HotkeyService via ConfigService", () => {
 });
 
 describe("ViewRegistry via ConfigService", () => {
+  test("parentIndex is rebuilt from the registered views", () => {
+    const registry = new ViewRegistry();
+    registry.setDynamic(
+      ViewSchema.parse({
+        id: "svc",
+        title: "Svc",
+        sections: [
+          {
+            id: "services",
+            title: "Services",
+            resources: [{ kind: "Service" }],
+            children: [{ id: "pods", relation: { type: "labelSelector", kind: "Pod", selector: "$.spec.selector" } }],
+          },
+        ],
+      }),
+    );
+    expect(registry.parentIndex.ancestorKinds({ group: "", kind: "Pod" }).map((k) => k.kind)).toEqual(["Service"]);
+  });
+
   test("later sources replace views with the same id; order by `order` then title", async () => {
     const { source, service, views } = setup();
     source.add("builtin://workload", "builtin", {

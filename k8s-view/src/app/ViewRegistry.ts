@@ -4,6 +4,7 @@ import type { ConfigOrigin } from "../core/config/origin";
 import { type ViewConfig, type ViewPatchConfig, ViewSchema } from "../core/config/schema";
 import { ExpressionEngine } from "../core/expression/ExpressionEngine";
 import { applyViewPatch } from "../core/view/merge";
+import { ParentIndex } from "../core/view/ParentIndex";
 import { compileView, type ViewDefinition } from "../core/view/ViewDefinition";
 import type { ConfigLocatedIssue, LoadedConfigFile } from "./ports/ConfigSource";
 
@@ -51,6 +52,7 @@ export class ViewRegistry implements vscode.Disposable {
   private fromFiles = new Map<string, RegisteredView>();
   private readonly dynamic = new Map<string, RegisteredView>();
   private hidden = new Set<string>();
+  private index = ParentIndex.empty;
   private readonly safeEngine = new ExpressionEngine("safe");
   private readonly strictEngine = new ExpressionEngine(false);
 
@@ -68,6 +70,11 @@ export class ViewRegistry implements vscode.Disposable {
 
   get(id: string): RegisteredView | undefined {
     return this.entries.get(id);
+  }
+
+  /** Parent relations of every enabled view (drawer Parent tab, Open Parent). */
+  get parentIndex(): ParentIndex {
+    return this.index;
   }
 
   isHidden(id: string): boolean {
@@ -169,6 +176,7 @@ export class ViewRegistry implements vscode.Disposable {
     const next = new Map(this.fromFiles);
     for (const [id, view] of this.dynamic) if (!next.has(id)) next.set(id, view);
     this.entries = next;
+    this.index = ParentIndex.build([...next.values()].filter((v) => v.definition.enabled).map((v) => v.definition));
     this.changed.fire();
   }
 
