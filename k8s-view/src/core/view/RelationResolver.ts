@@ -162,7 +162,7 @@ export class CompiledRelation {
         return toResolution(found, demandIn(child.namespace));
       }
       case "reverseFieldRef": {
-        const ns = c.allNamespaces || allNamespaces ? undefined : child.namespace;
+        const ns = c.allNamespaces ? undefined : child.namespace;
         const found = lookup.list(parent.group, parent.kind, ns)?.filter((p) => {
           const { name, ns: matchNs } = this.matchOf(p);
           return this.refersTo(child, name, matchNs);

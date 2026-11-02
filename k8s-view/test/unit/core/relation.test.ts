@@ -268,6 +268,27 @@ describe("inverse", () => {
     expect(r.demands).toEqual([{ group: "", kind: "Node", namespace: undefined }]);
   });
 
+  test("reverseFieldRef stays in the child's namespace unless the relation spans namespaces", () => {
+    const pvcKind = new ResourceKind("", "v1", "PersistentVolumeClaim", "persistentvolumeclaims", true);
+    const pod = res(kinds.pod, "db-0", { spec: { volumes: [{ persistentVolumeClaim: { claimName: "data" } }] } }, "a");
+    const mine = res(pvcKind, "data", {}, "a");
+    const elsewhere = res(pvcKind, "data", {}, "b");
+    const usedBy = {
+      type: "reverseFieldRef",
+      group: "",
+      kind: "Pod",
+      items: "$.spec.volumes[*].persistentVolumeClaim.claimName",
+      match: { name: "${name}" },
+    };
+    const parent = { group: "", kind: "PersistentVolumeClaim" };
+    const lookup = lookupOf([mine, elsewhere]);
+    const ns = (items: ChildItem[]) => items.map((i) => i.type === "resource" && i.resource.namespace);
+    const same = rel(usedBy).inverse(pod, parent, lookup, true);
+    expect(ns(same.items)).toEqual(["a"]);
+    expect(same.demands).toEqual([{ group: "", kind: "PersistentVolumeClaim", namespace: "a" }]);
+    expect(ns(rel({ ...usedBy, allNamespaces: true }).inverse(pod, parent, lookup).items)).toEqual(["a", "b"]);
+  });
+
   test("fieldRef finds routes referencing a service, across namespaces only when asked", () => {
     const svc = res(kinds.service, "web", {}, "app");
     const sameNs = res(kinds.httpRoute, "r1", { spec: { rules: [{ backendRefs: [{ name: "web" }] }] } }, "app");
