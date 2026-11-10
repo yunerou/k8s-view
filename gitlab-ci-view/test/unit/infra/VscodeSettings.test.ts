@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const { config } = vi.hoisted(() => ({
-  config: { user: undefined as unknown, workspace: undefined as unknown, values: new Map<string, unknown>() },
+  config: {
+    user: undefined as unknown,
+    workspace: undefined as unknown,
+    values: new Map<string, unknown>(),
+    mcp: undefined as unknown,
+  },
 }));
 
 vi.mock("vscode", async (original) => {
@@ -13,7 +18,11 @@ vi.mock("vscode", async (original) => {
       getConfiguration: () => ({
         get: (key: string, fallback: unknown) => (config.values.has(key) ? config.values.get(key) : fallback),
         inspect: (key: string) =>
-          key === "hosts" ? { key, globalValue: config.user, workspaceValue: config.workspace } : undefined,
+          key === "hosts"
+            ? { key, globalValue: config.user, workspaceValue: config.workspace }
+            : key === "mcp.enabled"
+              ? { key, globalValue: config.mcp, workspaceValue: false }
+              : undefined,
       }),
     },
   };
@@ -25,6 +34,7 @@ beforeEach(() => {
   config.user = undefined;
   config.workspace = undefined;
   config.values.clear();
+  config.mcp = undefined;
 });
 
 describe("VscodeSettings", () => {
@@ -71,4 +81,16 @@ describe("VscodeSettings", () => {
     expect(s.tokenExpiryWarningDays()).toBe(0);
     expect(s.defaultRefFilter()).toBe("current");
   });
+});
+
+test("MCP enabled reads only a user-level boolean and defaults to true", () => {
+  const settings = new VscodeSettings();
+  expect(settings.mcpEnabled()).toBe(true);
+  config.mcp = false;
+  expect(settings.mcpEnabled()).toBe(false);
+  config.mcp = "false";
+  expect(settings.mcpEnabled()).toBe(true);
+  config.mcp = true;
+  expect(settings.mcpEnabled()).toBe(true);
+  settings.dispose();
 });

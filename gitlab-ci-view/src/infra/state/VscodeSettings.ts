@@ -7,6 +7,7 @@ import { Emitter } from "../../core/util/Emitter";
 
 const SECTION = "gitlabCiView";
 const KEYS = [
+  "mcp.enabled",
   "hosts",
   "refresh.activeSeconds",
   "refresh.idleSeconds",
@@ -23,6 +24,11 @@ export class VscodeSettings extends Settings implements vscode.Disposable {
     const keys = KEYS.filter((k) => e.affectsConfiguration(`${SECTION}.${k}`));
     if (keys.length > 0) this.changed.fire(keys);
   });
+
+  mcpEnabled(): boolean {
+    const value = vscode.workspace.getConfiguration(SECTION).inspect<unknown>("mcp.enabled")?.globalValue;
+    return typeof value === "boolean" ? value : true;
+  }
 
   hosts(): readonly HostSetting[] {
     // `application` scope: read only User values so workspaces cannot redirect tokens.

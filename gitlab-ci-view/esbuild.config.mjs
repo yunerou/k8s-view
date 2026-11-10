@@ -2,9 +2,9 @@ import { build, context } from "esbuild";
 
 const watch = process.argv.includes("--watch");
 const options = {
-  entryPoints: ["src/extension.ts"],
+  entryPoints: { extension: "src/extension.ts", "mcp-bridge": "src/bridge/mcp-bridge.ts" },
   bundle: true,
-  outfile: "dist/extension.js",
+  outdir: "dist",
   format: "cjs",
   platform: "node",
   target: "node22",

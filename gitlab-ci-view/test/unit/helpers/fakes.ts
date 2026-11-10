@@ -43,6 +43,7 @@ export class FakeSettings extends Settings {
   private readonly changed = new Emitter<readonly string[]>();
   readonly onDidChange = this.changed.event;
   values = {
+    mcp: true,
     hosts: [] as HostSetting[],
     active: 10,
     idle: 60,
@@ -53,6 +54,9 @@ export class FakeSettings extends Settings {
   set(patch: Partial<FakeSettings["values"]>, keys: string[] = Object.keys(patch)) {
     Object.assign(this.values, patch);
     this.changed.fire(keys);
+  }
+  mcpEnabled() {
+    return this.values.mcp;
   }
   hosts() {
     return this.values.hosts;

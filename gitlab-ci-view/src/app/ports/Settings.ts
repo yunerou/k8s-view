@@ -9,6 +9,7 @@ export abstract class Settings {
   /** Fires when settings change; the argument lists changed keys (without the prefix), e.g. `["hosts"]`. */
   abstract readonly onDidChange: Event<readonly string[]>;
   /** User values only (`application` scope). */
+  abstract mcpEnabled(): boolean;
   abstract hosts(): readonly HostSetting[];
   abstract activeRefreshSeconds(): number;
   abstract idleRefreshSeconds(): number;

@@ -6,6 +6,7 @@ packages:
 
 # All packages use "catalog:" instead of version numbers; Renovate updates versions here.
 catalog:
+  "@modelcontextprotocol/sdk": 1.32.1
   "@aws-sdk/client-ec2": 3.1148.0
   "@aws-sdk/client-ssm": 3.1148.0
   "@aws-sdk/client-sts": 3.1148.0

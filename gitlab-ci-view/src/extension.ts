@@ -1,6 +1,7 @@
 import { Container } from "@needle-di/core";
 import * as vscode from "vscode";
 import { PipelineService } from "./app/PipelineService";
+import { Confirmer } from "./app/ports/Confirmer";
 import { GitLabApi } from "./app/ports/GitLabApi";
 import { Notifier } from "./app/ports/Notifier";
 import { Prompter } from "./app/ports/Prompter";
@@ -18,19 +19,24 @@ import { FileTokenSource } from "./infra/state/FileTokenSource";
 import { VscodeSecretStore } from "./infra/state/VscodeSecretStore";
 import { VscodeSettings } from "./infra/state/VscodeSettings";
 import { VscodeStateStore } from "./infra/state/VscodeStateStore";
+import { VscodeConfirmer } from "./infra/vscode/VscodeConfirmer";
 import { VscodeNotifier } from "./infra/vscode/VscodeNotifier";
 import { VscodePrompter } from "./infra/vscode/VscodePrompter";
 import { ExtensionApp } from "./ui/ExtensionApp";
+import { McpController } from "./ui/McpController";
 import { PipelineTreeProvider } from "./ui/tree/PipelineTreeProvider";
 
 /** Internal API returned only during integration tests (`GITLAB_CI_VIEW_INTEGRATION=1`). */
 export interface TestApi {
+  readonly mcp: McpController;
   readonly pipelines: PipelineService;
   readonly repos: RepoRegistry;
   readonly selection: RepoSelection;
   readonly tokens: TokenStore;
   readonly tree: PipelineTreeProvider;
 }
+
+let activeMcp: McpController | undefined;
 
 /** Single composition root: port → adapter (`useExisting` makes the port and adapter share one instance). */
 export async function activate(context: vscode.ExtensionContext): Promise<TestApi | undefined> {
@@ -47,10 +53,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
     .bind({ provide: GitLabApi, useExisting: GitLabHttp })
     .bind({ provide: RepoSource, useExisting: VscodeRepoSource })
     .bind({ provide: Prompter, useExisting: VscodePrompter })
+    .bind({ provide: Confirmer, useExisting: VscodeConfirmer })
     .bind({ provide: Notifier, useExisting: VscodeNotifier });
   await container.get(ExtensionApp).start();
+  activeMcp = container.get(McpController);
   if (process.env["GITLAB_CI_VIEW_INTEGRATION"] !== "1") return undefined;
   return {
+    mcp: container.get(McpController),
     pipelines: container.get(PipelineService),
     repos: container.get(RepoRegistry),
     selection: container.get(RepoSelection),
@@ -59,4 +68,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<TestAp
   };
 }
 
-export function deactivate(): void {}
+export async function deactivate(): Promise<void> {
+  await activeMcp?.dispose();
+  activeMcp = undefined;
+}

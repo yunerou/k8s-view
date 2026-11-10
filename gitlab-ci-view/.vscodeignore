@@ -1,5 +1,6 @@
 **
 !dist/extension.js
+!dist/mcp-bridge.js
 !dist/webview/**
 !resources/**
 !package.json

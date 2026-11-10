@@ -17,6 +17,7 @@ import { VscodeRepoSource } from "../infra/git/VscodeRepoSource";
 import { GitLabHttp } from "../infra/gitlab/GitLabHttp";
 import { VscodeSettings } from "../infra/state/VscodeSettings";
 import { registerCommands } from "./commands";
+import { McpController } from "./McpController";
 import { StatusBarController } from "./StatusBarController";
 import { PIPELINES_VIEW_ID, PipelineTreeProvider } from "./tree/PipelineTreeProvider";
 import { LogPanels } from "./webview/LogPanel";
@@ -29,6 +30,7 @@ export class ExtensionApp {
   private readonly rejectedHosts = new Set<string>();
 
   constructor(
+    private readonly mcp = inject(McpController),
     private readonly branches = inject(BranchStatusService),
     private readonly fullView = inject(FullViewModel),
     private readonly runFlow = inject(RunPipelineFlow),
@@ -82,6 +84,8 @@ export class ExtensionApp {
       }),
     );
     await this.repoSource.initialize();
+    subs.push(this.mcp);
+    await this.mcp.start();
     const view = vscode.window.createTreeView(PIPELINES_VIEW_ID, {
       treeDataProvider: this.tree,
       showCollapseAll: true,

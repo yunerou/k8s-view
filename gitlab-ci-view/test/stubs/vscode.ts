@@ -210,6 +210,7 @@ export const workspace = {
   },
   isTrusted: true,
   workspaceFolders: undefined as { uri: Uri; name: string }[] | undefined,
+  onDidChangeWorkspaceFolders: noEvent as Event<void>,
   onDidChangeConfiguration: noEvent as Event<{ affectsConfiguration(section: string): boolean }>,
   getConfiguration(_section?: string) {
     return {
@@ -277,7 +278,7 @@ export const window = {
   ): WebviewPanel {
     throw new Error("Stub: provide a webview panel in the test");
   },
-  async showQuickPick<T extends QuickPickItem>(
+  async showQuickPick<T extends QuickPickItem | string>(
     _items: readonly T[],
     _options?: { title?: string; matchOnDescription?: boolean },
   ): Promise<T | undefined> {
@@ -342,6 +343,8 @@ export interface Memento {
   update(key: string, value: unknown): Thenable<void>;
 }
 export interface ExtensionContext {
+  readonly globalStorageUri: Uri;
+  asAbsolutePath(relativePath: string): string;
   readonly extensionUri: Uri;
   readonly subscriptions: { dispose(): unknown }[];
   readonly workspaceState: Memento;
