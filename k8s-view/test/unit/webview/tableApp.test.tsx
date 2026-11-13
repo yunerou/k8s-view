@@ -112,23 +112,22 @@ describe("TableApp", () => {
     expect(screen.queryByRole("tab", { name: /Pods/ })).toBeNull();
   });
 
-  test("Enter opens the detail drawer with YAML in a <pre>", async () => {
+  test("Enter opens the detail drawer on Related and Manifest opens the editor", async () => {
     render(<TableApp />);
     await screen.findByRole("tab", { name: /Deployments/ });
-    const cell = within(screen.getAllByRole("row").find((r) => r.getAttribute("data-uid") === "b")!).getAllByRole(
+    const cell = within(screen.getAllByRole("row").find((r) => r.getAttribute("data-uid") === "a")!).getAllByRole(
       "gridcell",
     )[2]!;
     act(() => cell.focus());
     fireEvent.keyDown(cell, { key: "Enter" });
-    const drawer = await screen.findByRole("complementary", { name: /Details of Deployment default\/b/ });
-    expect(requests("table/details")).toEqual([{ sectionId: "deployments", uid: "b" }]);
-    await within(drawer).findByText("Replicas");
-    fireEvent.click(within(drawer).getByRole("tab", { name: "YAML" }));
-    expect(drawer.querySelector("pre")?.textContent).toContain("kind: Deployment");
-    fireEvent.click(within(drawer).getByRole("tab", { name: /Events/ }));
-    expect(within(drawer).getByText("BackOff")).toBeTruthy();
-    fireEvent.click(within(drawer).getByRole("button", { name: "Close details" }));
-    expect(screen.queryByRole("complementary")).toBeNull();
+    const drawer = await screen.findByRole("complementary");
+    expect(
+      within(drawer)
+        .getByRole("tab", { name: /Related/ })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    fireEvent.click(within(drawer).getByRole("button", { name: "Manifest" }));
+    expect(requests("table/openManifest")).toEqual([{ sectionId: "deployments", uid: "a" }]);
   });
 
   test("toolbar: group by, save to config and debounced savePrefs", async () => {
@@ -217,7 +216,7 @@ describe("TableApp", () => {
     await screen.findByRole("tab", { name: /Deployments/ });
     openRow("a");
     let drawer = await screen.findByRole("complementary", { name: /Details of Deployment default\/a/ });
-    await within(drawer).findByText("Replicas");
+    await within(drawer).findByText("default/web-1");
     fireEvent.click(within(drawer).getByRole("tab", { name: /Events/ }));
     act(() => notify("table/reset", vm));
     await waitFor(() => expect(requests("table/details")).toHaveLength(2));
@@ -234,12 +233,12 @@ describe("TableApp", () => {
   });
 
   test("restores the drawer tab from webview state", async () => {
-    setInitialState({ viewId: "workload", prefs: {}, drawerTab: "yaml" } satisfies TableWebviewState);
+    setInitialState({ viewId: "workload", prefs: {}, drawerTab: "overview" } satisfies TableWebviewState);
     render(<TableApp />);
     await screen.findByRole("tab", { name: /Deployments/ });
     openRow("a");
     const drawer = await screen.findByRole("complementary", { name: /Details of Deployment default\/a/ });
-    expect(within(drawer).getByRole("tab", { name: "YAML" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(drawer).getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true");
   });
 
   test("right-click opens the context menu for the row", async () => {

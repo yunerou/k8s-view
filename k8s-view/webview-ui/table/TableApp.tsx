@@ -58,7 +58,7 @@ export function TableApp() {
   const [hotkeys, setHotkeys] = useState<HotkeyState>();
   const [showHelp, setShowHelp] = useState(false);
   const savedTab = saved?.drawerTab;
-  const [drawerTab, setDrawerTab] = useState<DetailTab>(isDetailTab(savedTab) ? savedTab : "overview");
+  const [drawerTab, setDrawerTab] = useState<DetailTab>(isDetailTab(savedTab) ? savedTab : "related");
   const [drawerWidth, setDrawerWidth] = useState<number>();
   /** Bumped on reset: the extension drops drawer state then, so the open drawer reloads its details. */
   const [drawerEpoch, setDrawerEpoch] = useState(0);
@@ -127,7 +127,7 @@ export function TableApp() {
       viewId: model.viewId,
       prefs,
       ...(activeId === undefined ? {} : { activeSection: activeId }),
-      ...(drawerTab === "overview" ? {} : { drawerTab }),
+      ...(drawerTab === "related" ? {} : { drawerTab }),
       ...(model.scope
         ? { scope: { direction: model.scope.direction, context: model.scope.context, source: model.scope.source } }
         : {}),
@@ -212,9 +212,51 @@ export function TableApp() {
     [],
   );
 
+  const contextControls = model && (
+    <div className="table-context">
+      <button
+        type="button"
+        className="toolbar-button"
+        role="switch"
+        aria-checked={!!model.independent}
+        title={l10n.t("Use a separate cluster and namespace for this tab until it closes")}
+        onClick={() => request(TableRequests.setIndependent, { enabled: !model.independent }).catch(report)}
+      >
+        <Codicon name={model.independent ? "unlock" : "link"} />
+        {l10n.t("Independent context")}
+      </button>
+      <button
+        type="button"
+        className="toolbar-button"
+        disabled={!model.independent}
+        title={l10n.t("Select cluster for this tab")}
+        onClick={() => request(TableRequests.pickContext).catch(report)}
+      >
+        <Codicon name="server-environment" />
+        {model.context ?? l10n.t("No context")}
+      </button>
+      <button
+        type="button"
+        className="toolbar-button"
+        disabled={!model.independent}
+        title={l10n.t("Select namespace for this tab")}
+        onClick={() => request(TableRequests.pickNamespace).catch(report)}
+      >
+        <Codicon name="symbol-namespace" />
+        {scopeLabel(model.namespaceScope)}
+      </button>
+    </div>
+  );
+
   if (!model || !section || activeId === undefined) {
     return (
       <div className="app table-app">
+        {model && (
+          <header className="view-header">
+            <h1>{model.title}</h1>
+            {contextControls}
+          </header>
+        )}
         {error ? (
           <Banner kind="error">{error}</Banner>
         ) : (
@@ -235,9 +277,7 @@ export function TableApp() {
     <div className="app table-app">
       <header className="view-header">
         <h1>{model.title}</h1>
-        <span className="muted">
-          {[model.context ?? l10n.t("No context"), scopeLabel(model.namespaceScope)].filter(Boolean).join(" · ")}
-        </span>
+        {contextControls}
         {model.scope && (
           <ScopeChip
             scope={model.scope}

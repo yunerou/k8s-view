@@ -2,24 +2,37 @@
 
 **See your workloads. Follow their pods. Read their logs. Stay in VS Code.**
 
-K8s View brings your Kubernetes resources into a live sidebar and an interactive table. Pick a cluster and
+K8s View brings your Kubernetes resources into interactive editor tables with a sidebar for context and view selection. Pick a cluster and
 namespace, open a built-in view, and start exploring — no JSON configuration needed.
 
 [**Install from the VS Code Marketplace**](https://marketplace.visualstudio.com/items?itemName=yunerou.k8s-view)
 · [Report an issue](https://github.com/yunerou/k8s-view/issues)
 · [Vietnamese guide](https://github.com/yunerou/k8s-view/blob/main/k8s-view/docs/README.md)
 
-![Open the Workload table and filter deployments in K8s View](https://raw.githubusercontent.com/yunerou/k8s-view/main/k8s-view/resources/demos/workload-table.gif)
+![Open the Workload table and filter deployments in K8s View](https://raw.githubusercontent.com/yunerou/k8s-view/main/k8s-view/resources/demos/workload-table.jpg)
 
-*Recorded in VS Code against a live cluster. Context names are anonymized; sensitive identifiers are blurred.*
+*Captured from K8s View 0.0.6 in VS Code against a live cluster. Sensitive identifiers have been blurred.*
+
+## What’s new in 0.0.6
+
+- **Views open in editor tabs.** The sidebar now lists views directly; Context and Snippets remain alongside them.
+- **Compare the same view in multiple tabs.** Open another Workload, Service or custom view with its own session.
+- **Choose a context per tab.** Independent context lets one tab use a different cluster or namespace while other tabs follow the shared Context selection.
+- **Inspect Pod containers in Overview.** Read each container’s image, command, arguments and resource requests/limits alongside its identity and documentation link.
+- **Start investigations in Related.** The detail drawer opens with related resources and puts Describe, Manifest and Run commands at the top.
+- **Load only the active section.** Tables watch their active section; other sections may show previously loaded data and do not show a count until it is known.
+
+The current table also includes expression filters, grouping by any column, a Parent drawer tab and live Related/Parent tables, described below.
+
+For a step-by-step explanation in Vietnamese, see the [0.0.6 feature guide](https://github.com/yunerou/k8s-view/blob/main/k8s-view/FEATURES.vi.md).
 
 ## Start with your first workload
 
 1. **Install K8s View.** VS Code also installs its dependency, Microsoft's
    [Kubernetes extension](https://marketplace.visualstudio.com/items?itemName=ms-kubernetes-tools.vscode-kubernetes-tools).
 2. **Open K8s View** from the Activity Bar. In **Context**, choose a cluster from your kubeconfig and a namespace.
-3. **Expand Workload → Deployments** to see readiness at a glance, then follow a Deployment → ReplicaSet → Pod → container.
-4. **Open as table** from the Workload title bar for filtering and sorting. Double-click a row to inspect it;
+3. In the **View** sidebar section, click **Workload** to open its Full view in an editor tab, then select **Deployments**.
+4. Filter and sort the table. Double-click a row to inspect it and expand its **Related** resources;
    right-click for the actions available on that resource.
 
 Prefer the Command Palette? Run **K8s View: Select context…**, then **K8s View: Open as table**.
@@ -32,7 +45,22 @@ such as `aws`, `kubelogin` or `gke-gcloud-auth-plugin`, that plugin must be avai
 
 ### Find the resource you need
 
-Use the sidebar to navigate relationships, or open the same view as a table when you want to compare resources.
+Choose a view from the sidebar to open its table in the Editor. Cluster and namespace buttons in **Context** open VS Code Quick Pick menus.
+
+#### Compare clusters or namespaces in separate tabs
+
+1. Right-click a view in the sidebar and choose **Open in New Tab**, or click **Open in New Tab** in an open table’s editor title bar. You can also run **K8s View: Open in New Tab**.
+2. The new tab starts with **Independent context** enabled. When opened from a table of the same view, it starts from that table’s cluster and namespace; otherwise it starts from the shared Context selection.
+3. Use the cluster and namespace buttons in the table header to choose this tab’s context. These controls are enabled while **Independent context** is on. The namespace picker also offers **All namespaces** and **Enter namespace…**.
+4. Drag the tab into another editor group to compare tables side by side. Each table has its own resource session.
+
+You can also enable **Independent context** in an existing table. Changes in the sidebar’s **Context** then leave that tab’s selection in place. Turn the toggle off to follow the current shared context again. Closing the tab discards its private context without changing the shared selection; the private selection is not restored after a window reload.
+
+For example, leave the sidebar on `kube-system`, open another Workload tab, and choose `cert-manager` there. The screenshot shows the tab’s namespace differing from the sidebar’s namespace.
+
+![A second Workload tab uses cert-manager while the shared Context remains kube-system](https://raw.githubusercontent.com/yunerou/k8s-view/main/k8s-view/resources/demos/independent-context.jpg)
+
+#### Filter, group and arrange resources
 
 - **Filter by name**, sort by a column, or turn on **column filters** to narrow the list further.
 - **Group rows** by kind, namespace, status, a resource label or any column (for example Pods by Node).
@@ -41,27 +69,67 @@ Use the sidebar to navigate relationships, or open the same view as a table when
 - **Check CPU and memory** in the Pods and Node tables. Usage requires the cluster's metrics API and permission
   to read it; unavailable values appear as `-`.
 
-Column filters understand expressions: `>0`, `<1h`, `>100%`, `>500m`, `>1Gi`, `!=Running` or `a|b`. Type them in the
-filter row, or in the search box as `restarts:>0 age:<1h`. Right-click a resource and choose **Open Related** or
-**Open Parent** to open a table tab limited to its related or parent resources, kept up to date live. The chip at the
-top of that tab turns the limit off.
+Click the funnel button to show a filter field under each column. Filters are remembered per section, so a Pods filter does not become a Deployments filter.
 
-Select **Live** for watch updates, choose **3s / 5s / 10s** polling, or **Pause** while you investigate.
+| Expression | Meaning |
+| --- | --- |
+| `>0`, `>=2`, `<=5` | Numeric comparison, such as restarts or available replicas |
+| `<1h`, `>=2d` | Resource age; duration suffixes include `s`, `m`, `h`, `d` and `w` |
+| `>500m` | CPU usage above 500 millicores, in a CPU column |
+| `>1Gi` | Memory above 1 GiB, in a memory column |
+| `>100%` | A percentage above 100, in a percentage column |
+| `=Running`, `!=Running` | Exact text equality or inequality, ignoring case |
+| `!pending` | Text does not contain `pending` |
+| `Running\|Pending` | Either text match in the same column |
+
+Use column qualifiers in the search box to combine filters, for example `restarts:>0 age:<1h`, with ordinary text to find a particular workload. Different column filters combine with AND; `|` alternatives within one expression combine with OR. Qualifiers use a column ID or its title slug. Invalid expressions are marked with an explanation and do not filter out rows; correct the expression to apply it.
+
+![Column filters narrow Deployments to those with at least two available replicas](https://raw.githubusercontent.com/yunerou/k8s-view/main/k8s-view/resources/demos/column-filters.jpg)
+
+Choose **Group by → Node** in Pods to organize Pods by their assigned Node, or choose another column, namespace, kind, status or resource label. Choose **None** to return to a flat table. Column visibility, order and width can be adjusted separately; **Save to config** writes the column layout to the view definition.
+
+Select **Live** in Context for watch updates, choose **3s / 5s / 10s** polling, or **Pause** while you investigate. Only the active table section is watched. Counts on unvisited sections may be absent, and inactive sections can retain previously loaded data until you open them.
 
 ### Inspect a workload without losing your place
 
-Double-click a table row to open its details alongside the list:
+Double-click a table row to open its details alongside the list. Use **Describe**, **Manifest** and **Run commands** at the top of the drawer. Drag the drawer’s left edge to resize it, use its refresh button to reload details, or press `Escape` to close it. The selected detail tab stays selected when you open another resource.
 
 | Tab | What you can check |
 | --- | --- |
-| **Overview** | Identity, readiness, age, labels and official documentation for supported Kubernetes kinds |
-| **YAML** | The resource manifest |
+| **Related** | Shown first; expand related resources, such as a Deployment's ReplicaSets and their Pods |
+| **Overview** | Identity, readiness, age, labels, official documentation, and Pod containers with image, command, args and resources |
 | **Events** | Events associated with the resource |
 | **Conditions** | Status, reasons and messages reported by Kubernetes or a controller |
-| **Related** | Expand related resources, such as a Deployment's ReplicaSets and their Pods |
 | **Parent** | Owners and other resources that point at this one, such as selecting Services, Nodes or routes |
 
-![Inspect workload conditions and expand related ReplicaSets and Pods](https://raw.githubusercontent.com/yunerou/k8s-view/main/k8s-view/resources/demos/resource-details.gif)
+![Inspect workload conditions and expand related ReplicaSets and Pods](https://raw.githubusercontent.com/yunerou/k8s-view/main/k8s-view/resources/demos/resource-details.jpg)
+
+#### Inspect container configuration in Pod Overview
+
+Open **Workload → Pods**, double-click a Pod and choose **Overview**. In addition to identity, status, labels, owners and UID, the **Containers** area shows each container’s:
+
+- **Image:** the configured registry, repository and tag or digest.
+- **Command** and **Args:** the arrays declared in the Pod specification. An empty array means there is no explicit override in the Pod spec; it does not show the image’s default entrypoint.
+- **Resources:** configured requests and limits. These are the Pod’s declared settings; live CPU and memory usage appears in the table when the metrics API is available.
+
+For supported built-in kinds, **Documentation** links directly to the corresponding official Kubernetes guide.
+
+![Pod Overview shows the image, command, arguments and resource requests and limits](https://raw.githubusercontent.com/yunerou/k8s-view/main/k8s-view/resources/demos/pod-overview.jpg)
+
+#### Follow related resources and parents in their own tables
+
+In **Related**, expand a Deployment’s ReplicaSet to see its Pods. **Parent** follows relations in the other direction: a Pod can show its owner ReplicaSet, assigned Node, selecting Service or PodDisruptionBudget. Available relations depend on the view definitions and resource data.
+
+![The Parent tab shows a Pod’s owner, Node and selecting resources](https://raw.githubusercontent.com/yunerou/k8s-view/main/k8s-view/resources/demos/resource-parent.jpg)
+
+Choose **Open in table** in either drawer tab, or right-click a row and choose **Open Related** / **Open Parent**. The resulting tab lists resources within the source resource’s scope and keeps the relation up to date as resources change.
+
+- The **Scope** chip identifies the source; click its name to open the source manifest.
+- Click the chip’s **×** to show all resources of the tab’s resource kinds, within its current context and namespace.
+- Click **Restore** to apply the source scope again.
+- Use the scoped table’s normal sections, sorting, filters and detail drawer to continue investigating.
+
+![A Related table lists only the Pods associated with the selected Deployment](https://raw.githubusercontent.com/yunerou/k8s-view/main/k8s-view/resources/demos/related-table.jpg)
 
 ### Read logs from every pod in a workload
 
@@ -72,11 +140,11 @@ highlighted log levels. New matching pods are picked up automatically during a r
 For a single Pod, choose **Logs** or **Logs of container…**. Logs stream directly from the Kubernetes API;
 they do not require `kubectl`.
 
-![Open color-coded logs from all Pods in a Deployment](https://raw.githubusercontent.com/yunerou/k8s-view/main/k8s-view/resources/demos/multi-pod-logs.gif)
+![Open color-coded logs from all Pods in a Deployment](https://raw.githubusercontent.com/yunerou/k8s-view/main/k8s-view/resources/demos/multi-pod-logs.jpg)
 
 ### Run the right action on the right resource
 
-Right-click a resource in the sidebar or table to see its available actions. The selected context and
+Right-click a resource in the table to see its available actions. The selected context and
 namespace travel with the action, so you do not have to copy resource names into a terminal.
 
 | When you want to… | Choose… |
@@ -88,12 +156,16 @@ namespace travel with the action, so you do not have to copy resource names into
 | Inspect a Secret | **Decrypt secret**, or reveal/copy a single decoded value on demand |
 | Restart or scale workloads | **Rollout restart** or **Scale…**, after enabling the dangerous-command policy |
 
+![Resource actions include Related, Parent, multi-pod logs and workload commands](https://raw.githubusercontent.com/yunerou/k8s-view/main/k8s-view/resources/demos/resource-actions.jpg)
+
+**Delete** is available for custom and cluster-scoped resources as well as built-in kinds, including mixed multi-selections. The dangerous-command policy still applies.
+
 The table also supports **multi-select** for commands on several resources, including batch actions such as
 copying names, restarting workloads and scaling replicas.
 
 ## Built-in views for more than Pods
 
-Use **Switch view…** in the View title bar to move between these views. Hide the ones you do not use with
+Click a view in the sidebar, or use **Switch view…** in the View title bar. Hide the ones you do not use with
 **Show/hide views…**.
 
 | View | Explore |

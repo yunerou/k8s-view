@@ -66,6 +66,7 @@ export const ContextRequests = {
   getState: { method: "context/getState" } as RequestType<void, ContextPanelState>,
   /** Open VS Code's context Quick Pick (enough room for long cluster names). */
   pickContext: { method: "context/pickContext" } as RequestType<void, void>,
+  pickNamespace: { method: "context/pickNamespace" } as RequestType<void, void>,
   selectNamespace: { method: "context/selectNamespace" } as RequestType<{ scope: NamespaceScope }, void>,
   refreshNamespaces: { method: "context/refreshNamespaces" } as RequestType<void, void>,
   /** Reconnect; contexts using exec auth sign in again in the terminal. */
@@ -168,6 +169,7 @@ export interface TableScope extends ScopeRef {
 }
 
 export interface TableViewModel {
+  readonly independent?: boolean;
   readonly viewId: string;
   readonly title: string;
   readonly context: string | undefined;
@@ -242,6 +244,13 @@ export interface RelatedItem {
 }
 
 export interface RowDetails {
+  readonly containers?: readonly {
+    readonly name: string;
+    readonly image: string;
+    readonly command: readonly string[];
+    readonly args: readonly string[];
+    readonly resources: Readonly<Record<string, unknown>>;
+  }[];
   /** Official concept guide; not tied to the cluster's Kubernetes version. */
   readonly documentation?: { readonly kind: string; readonly url: string };
   readonly overview: readonly { readonly label: string; readonly value: string }[];
@@ -253,6 +262,10 @@ export interface RowDetails {
 }
 
 export const TableRequests = {
+  setIndependent: { method: "table/setIndependent" } as RequestType<{ enabled: boolean }, void>,
+  pickContext: { method: "table/pickContext" } as RequestType<void, void>,
+  pickNamespace: { method: "table/pickNamespace" } as RequestType<void, void>,
+  describe: { method: "table/describe" } as RequestType<RowRef, void>,
   /** `activeSection`: the restored section tab, the only one whose kinds are watched. */
   getViewModel: { method: "table/getViewModel" } as RequestType<{ activeSection?: string }, TableViewModel>,
   /** Section tab changed: watch its kinds instead of the previous tab's. */

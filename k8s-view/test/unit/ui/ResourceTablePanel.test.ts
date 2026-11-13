@@ -98,7 +98,13 @@ beforeEach(async () => {
   state = new FakeState();
   const settings = new FakeSettings();
   contexts = new ContextService(
-    new FakeKubeConfig([{ name: "dev", cluster: "dev", user: "u", namespace: "a" }], "dev"),
+    new FakeKubeConfig(
+      [
+        { name: "dev", cluster: "dev", user: "u", namespace: "a" },
+        { name: "prod", cluster: "prod", user: "u", namespace: "a" },
+      ],
+      "dev",
+    ),
     state,
     settings,
     new FakeClusterApi(),
@@ -196,6 +202,7 @@ beforeEach(async () => {
     { open: manifestsOpen } as unknown as ManifestDocumentProvider,
     new HotkeyService(state, settings, registry),
     scoped,
+    new FakeClusterApi(),
   );
   tables.open("workload");
   await request("getViewModel");
@@ -483,5 +490,165 @@ describe("scoped tabs", () => {
     const other = { ...panel, dispose: vi.fn() } as unknown as vscode.WebviewPanel;
     await tables.deserializeWebviewPanel(other, { viewId: "related.x", scope: { ...scopeRef, context: "prod" } });
     expect(other.dispose).toHaveBeenCalled();
+  });
+});
+
+describe("independent table context", () => {
+  test("pins the tab until disabled without persisting namespace changes", async () => {
+    const shared = contexts.current;
+    const writeGlobal = vi.spyOn(state, "setGlobal");
+    await request("setIndependent", { enabled: true });
+    await contexts.selectContext("prod");
+    let model = await request<TableViewModel>("getViewModel");
+    expect(model.context).toBe("dev");
+    expect(model.independent).toBe(true);
+    await request("hotkey", { action: { namespace: "private" }, sectionId: "deployments", uids: [] });
+    model = await request<TableViewModel>("getViewModel");
+    expect(model.namespaceScope).toEqual({ type: "single", name: "private" });
+    expect(contexts.current?.name).toBe("prod");
+    expect(contexts.current?.scope).toEqual(shared?.scope);
+    expect(writeGlobal).not.toHaveBeenCalled();
+    await request("setIndependent", { enabled: false });
+    model = await request<TableViewModel>("getViewModel");
+    expect(model.context).toBe("prod");
+    expect(model.independent).toBe(false);
+  });
+
+  test("cluster picker changes only the tab and commands use its context", async () => {
+    await request("setIndependent", { enabled: true });
+    pick.mockImplementationOnce((items) => items.find((item: { label: string }) => item.label === "prod"));
+    await request("pickContext");
+    await vi.waitFor(async () => {
+      const model = await request<TableViewModel>("getViewModel");
+      expect(model.sections[0]?.rows.length).toBeGreaterThan(0);
+    });
+    expect((await request<TableViewModel>("getViewModel")).context).toBe("prod");
+    expect(contexts.current?.name).toBe("dev");
+    const commands = await request<CommandItem[]>("commandsFor", { sectionId: "deployments", uids: [deployment.uid] });
+    await request("runCommand", {
+      sectionId: "deployments",
+      uids: [deployment.uid],
+      commandId: commands.find((c) => !c.blocked)!.id,
+    });
+    expect((execute.mock.calls as unknown[][])[0]?.[2]).toMatchObject({ context: { name: "prod" } });
+    await request("openManifest", { sectionId: "deployments", uid: deployment.uid });
+    expect(manifestsOpen).toHaveBeenLastCalledWith(expect.objectContaining({ context: "prod" }));
+  });
+
+  test("keeps pinned related tabs across shared cluster changes", async () => {
+    await request("setIndependent", { enabled: true });
+    const origin = panel;
+    panel = makePanel();
+    await request("openScoped", { sectionId: "deployments", uid: deployment.uid, direction: "related" });
+    const relatedHandlers = byPanel.get(panel)!;
+    expect(((await relatedHandlers.get("table/getViewModel")!()) as TableViewModel).context).toBe("dev");
+    await contexts.selectContext("prod");
+    expect(panel.dispose).not.toHaveBeenCalled();
+    expect(((await relatedHandlers.get("table/getViewModel")!()) as TableViewModel).context).toBe("dev");
+    expect(byPanel.has(origin)).toBe(true);
+  });
+});
+
+test("Pod details include complete container configuration", async () => {
+  const containers = [
+    {
+      name: "app",
+      image: "nginx:1.27",
+      command: ["nginx"],
+      args: ["-g", "daemon off;"],
+      resources: { requests: { cpu: "100m" }, limits: { memory: "256Mi" } },
+    },
+  ];
+  const pod = res(kinds.pod, "app", { spec: { containers } }, "a");
+  source.set(kinds.pod, "a", [pod]);
+  panel = makePanel();
+  tables.open("pods");
+  await request("getViewModel");
+  const details = await request<RowDetails>("details", { sectionId: "pods", uid: pod.uid });
+  expect(details.containers).toEqual(containers);
+});
+
+test("closing an independent tab disposes its session and does not change shared context", async () => {
+  const disposed = new vscode.EventEmitter<void>();
+  panel = makePanel();
+  Object.defineProperty(panel, "onDidDispose", { value: disposed.event });
+  tables.open("pods");
+  const create = vi.spyOn(sessions, "createIndependent");
+  await request("setIndependent", { enabled: true });
+  const local = create.mock.results[0]!.value!;
+  const dispose = vi.spyOn(local, "dispose");
+  const shared = contexts.current;
+  disposed.fire();
+  expect(dispose).toHaveBeenCalledOnce();
+  expect(contexts.current).toBe(shared);
+});
+
+describe("multiple tabs of the same view", () => {
+  async function model(tab: vscode.WebviewPanel) {
+    return (await byPanel.get(tab)!.get("table/getViewModel")!()) as TableViewModel;
+  }
+
+  test("opens a separate pinned tab and commands use only its selected context", async () => {
+    const original = panel;
+    panel = makePanel();
+    tables.openNew("workload");
+    const duplicate = panel;
+    expect(byPanel.has(duplicate)).toBe(true);
+    expect(await model(duplicate)).toMatchObject({ viewId: "workload", context: "dev", independent: true });
+    pick.mockImplementationOnce((items) => items.find((item: { label: string }) => item.label === "prod"));
+    await request("pickContext");
+    expect(await model(duplicate)).toMatchObject({ context: "prod", independent: true });
+    expect(await model(original)).toMatchObject({ context: "dev", independent: false });
+    await request("runCommand", { sectionId: "deployments", uids: [deployment.uid], commandId: "manifest" });
+    expect(execute).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ context: expect.objectContaining({ name: "prod" }) }),
+    );
+  });
+
+  test("tabs following the shared context hold separate leases and survive another tab closing", async () => {
+    const original = panel;
+    const disposed = new vscode.EventEmitter<void>();
+    panel = makePanel();
+    Object.defineProperty(panel, "onDidDispose", { value: disposed.event });
+    tables.openNew("workload");
+    await request("setIndependent", { enabled: false });
+    await model(panel);
+    expect(source.leases.get("apps/Deployment|a")).toBe(2);
+    disposed.fire();
+    expect(source.leases.get("apps/Deployment|a")).toBe(1);
+    expect((await model(original)).sections[0]!.rows).toHaveLength(2);
+    const reveal = vi.spyOn(original, "reveal");
+    tables.open("workload");
+    expect(reveal).toHaveBeenCalledOnce();
+    disposed.dispose();
+  });
+
+  test("duplicates the active tab’s private cluster and namespace", async () => {
+    await request("setIndependent", { enabled: true });
+    await request("hotkey", { action: { namespace: "private" }, sectionId: "deployments", uids: [] });
+    panel = makePanel();
+    tables.openNew();
+    expect(await model(panel)).toMatchObject({
+      context: "dev",
+      namespaceScope: { type: "single", name: "private" },
+      independent: true,
+    });
+    await request("setIndependent", { enabled: false });
+    await contexts.selectContext("prod");
+    expect(await model(panel)).toMatchObject({ context: "prod", independent: false });
+  });
+
+  test("restores two instances without losing either panel", async () => {
+    const original = panel;
+    const restored = makePanel();
+    await tables.deserializeWebviewPanel(restored, { viewId: "workload" });
+    expect(await model(original)).toMatchObject({ viewId: "workload" });
+    expect(await model(restored)).toMatchObject({ viewId: "workload" });
+    expect(source.leases.get("apps/Deployment|a")).toBe(2);
+    tables.dispose();
+    expect(original.dispose).toHaveBeenCalled();
+    expect(restored.dispose).toHaveBeenCalled();
   });
 });

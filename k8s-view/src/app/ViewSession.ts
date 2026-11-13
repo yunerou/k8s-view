@@ -79,7 +79,7 @@ export class ViewSession implements vscode.Disposable {
 
   constructor(
     private registered: RegisteredView,
-    private readonly contexts: ContextService,
+    private readonly contexts: Pick<ContextService, "current" | "onDidChange">,
     private readonly source: ResourceSource,
     private readonly settings: Settings,
     private readonly parentIndex: () => ParentIndex = () => ParentIndex.empty,

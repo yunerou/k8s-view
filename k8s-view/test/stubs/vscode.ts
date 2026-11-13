@@ -261,6 +261,12 @@ export const window = {
   ): Promise<T | undefined> {
     return undefined;
   },
+  async showInputBox(_options?: {
+    title?: string;
+    validateInput?: (value: string) => string | undefined;
+  }): Promise<string | undefined> {
+    return undefined;
+  },
   async showWarningMessage(_message: string, ..._items: unknown[]): Promise<string | undefined> {
     return undefined;
   },

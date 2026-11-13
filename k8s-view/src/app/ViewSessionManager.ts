@@ -9,7 +9,7 @@ import { Settings } from "./ports/Settings";
 import { ViewRegistry } from "./ViewRegistry";
 import { type LeaseOwner, ViewSession } from "./ViewSession";
 
-/** One ViewSession per registered view; the tree and table for a view share a session (and leases). */
+/** Registry sessions for views; editor tabs create separate sessions to own their context and leases. */
 @injectable()
 export class ViewSessionManager implements vscode.Disposable {
   private readonly sessions = new Map<string, ViewSession>();
@@ -41,6 +41,16 @@ export class ViewSessionManager implements vscode.Disposable {
       }
     }
     return undefined;
+  }
+
+  createIndependent(
+    viewId: string,
+    contexts: Pick<ContextService, "current" | "onDidChange">,
+  ): ViewSession | undefined {
+    const view = this.sessions.get(viewId)?.view;
+    return view
+      ? new ViewSession(view, contexts, this.source, this.settings, () => this.registry.parentIndex)
+      : undefined;
   }
 
   session(viewId: string): ViewSession | undefined {

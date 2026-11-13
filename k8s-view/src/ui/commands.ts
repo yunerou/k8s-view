@@ -158,6 +158,12 @@ export function registerCommands(d: CommandDeps): vscode.Disposable[] {
       const viewId = typeof arg === "string" ? arg : await pickView(d, vscode.l10n.t("Open which view as a table?"));
       if (viewId) d.tables.open(viewId);
     }),
+    reg("k8sView.openTableInNewTab", async (arg) => {
+      if (typeof arg === "string") return d.tables.openNew(arg);
+      if (d.tables.tableActive) return d.tables.openNew();
+      const viewId = await pickView(d, vscode.l10n.t("Open which view in a new tab?"));
+      if (viewId) d.tables.openNew(viewId);
+    }),
     reg("k8sView.editViewConfig", async (arg) => {
       const viewId = typeof arg === "string" ? arg : await pickView(d, vscode.l10n.t("Edit which view?"));
       const view = viewId ? d.views.get(viewId) : undefined;
@@ -899,7 +905,7 @@ async function switchView(d: CommandDeps): Promise<void> {
 
   const qp = vscode.window.createQuickPick<Item>();
   qp.title = vscode.l10n.t("K8s View: Switch view");
-  qp.placeholder = vscode.l10n.t("Only the selected view is shown and watched");
+  qp.placeholder = vscode.l10n.t("Select a view to open in an editor tab");
   qp.matchOnDescription = true;
   qp.items = items;
   const current = views.find((i) => i.viewId === active);

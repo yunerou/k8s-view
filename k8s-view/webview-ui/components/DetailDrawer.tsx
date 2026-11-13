@@ -9,8 +9,8 @@ import { RelatedTree } from "./RelatedTree";
 import { StatusDot } from "./StatusDot";
 import { Tabs } from "./Tabs";
 
-export type DetailTab = "overview" | "yaml" | "events" | "conditions" | "related" | "parent";
-const DETAIL_TABS: readonly string[] = ["overview", "yaml", "events", "conditions", "related", "parent"];
+export type DetailTab = "overview" | "events" | "conditions" | "related" | "parent";
+const DETAIL_TABS: readonly string[] = ["related", "overview", "events", "conditions", "parent"];
 
 export function isDetailTab(v: unknown): v is DetailTab {
   return typeof v === "string" && DETAIL_TABS.includes(v);
@@ -41,11 +41,11 @@ function conditionLevel(status: string): StatusLevel {
   return status === "True" ? "ok" : status === "False" ? "warning" : "unknown";
 }
 
-/** Right-hand detail drawer: Overview / YAML / Events / Conditions / Related. */
+/** Right-hand detail drawer, with related resources first. */
 export function DetailDrawer({ sectionId, uid, title, onClose, ...controlled }: DetailDrawerProps) {
   const [details, setDetails] = useState<RowDetails>();
   const [error, setError] = useState<string>();
-  const [ownTab, setOwnTab] = useState<DetailTab>("overview");
+  const [ownTab, setOwnTab] = useState<DetailTab>("related");
   const tab = controlled.tab ?? ownTab;
   const setTab = (t: DetailTab) => {
     setOwnTab(t);
@@ -104,11 +104,10 @@ export function DetailDrawer({ sectionId, uid, title, onClose, ...controlled }: 
   };
 
   const tabs = [
+    { id: "related", label: l10n.t("Related"), count: details?.related.reduce((n, g) => n + g.items.length, 0) },
     { id: "overview", label: l10n.t("Overview") },
-    { id: "yaml", label: l10n.t("YAML") },
     { id: "events", label: l10n.t("Events"), count: details?.events.length },
     { id: "conditions", label: l10n.t("Conditions"), count: details?.conditions.length },
-    { id: "related", label: l10n.t("Related"), count: details?.related.reduce((n, g) => n + g.items.length, 0) },
     { id: "parent", label: l10n.t("Parent"), count: details?.parents.reduce((n, g) => n + g.items.length, 0) },
   ];
 
@@ -142,9 +141,29 @@ export function DetailDrawer({ sectionId, uid, title, onClose, ...controlled }: 
         </h2>
         <button
           type="button"
-          className="icon-button"
-          aria-label={l10n.t("Commands")}
-          title={l10n.t("Commands")}
+          className="toolbar-button"
+          onClick={() =>
+            request(TableRequests.describe, { sectionId, uid }).catch((e: unknown) => setError(errorMessage(e)))
+          }
+        >
+          <Codicon name="info" />
+          {l10n.t("Describe")}
+        </button>
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() =>
+            request(TableRequests.openManifest, { sectionId, uid }).catch((e: unknown) => setError(errorMessage(e)))
+          }
+        >
+          <Codicon name="file-code" />
+          {l10n.t("Manifest")}
+        </button>
+        <button
+          type="button"
+          className="toolbar-button"
+          aria-label={l10n.t("Run commands")}
+          title={l10n.t("Run commands")}
           onClick={() =>
             request(TableRequests.pickCommand, { sectionId, uids: [uid] }).catch((e: unknown) =>
               setError(errorMessage(e)),
@@ -152,6 +171,7 @@ export function DetailDrawer({ sectionId, uid, title, onClose, ...controlled }: 
           }
         >
           <Codicon name="run-all" />
+          <span>{l10n.t("Run commands")}</span>
         </button>
         <button
           type="button"
@@ -218,12 +238,45 @@ export function DetailDrawer({ sectionId, uid, title, onClose, ...controlled }: 
                 <dd>{o.value}</dd>
               </div>
             ))}
+            {details.containers && (
+              <div className="overview-item">
+                <dt>{l10n.t("Containers")}</dt>
+                <dd>
+                  {details.containers.map((c) => (
+                    <section className="container-overview" key={c.name}>
+                      <h3>{c.name}</h3>
+                      <dl className="overview">
+                        <div className="overview-item">
+                          <dt>{l10n.t("Image")}</dt>
+                          <dd>
+                            <code>{c.image}</code>
+                          </dd>
+                        </div>
+                        <div className="overview-item">
+                          <dt>{l10n.t("Command")}</dt>
+                          <dd>
+                            <pre>{JSON.stringify(c.command)}</pre>
+                          </dd>
+                        </div>
+                        <div className="overview-item">
+                          <dt>{l10n.t("Args")}</dt>
+                          <dd>
+                            <pre>{JSON.stringify(c.args)}</pre>
+                          </dd>
+                        </div>
+                        <div className="overview-item">
+                          <dt>{l10n.t("Resources")}</dt>
+                          <dd>
+                            <pre>{JSON.stringify(c.resources, null, 2)}</pre>
+                          </dd>
+                        </div>
+                      </dl>
+                    </section>
+                  ))}
+                </dd>
+              </div>
+            )}
           </dl>
-        )}
-        {details && tab === "yaml" && (
-          <pre className="yaml">
-            <code>{details.yaml}</code>
-          </pre>
         )}
         {details && tab === "events" && (
           <DetailTable

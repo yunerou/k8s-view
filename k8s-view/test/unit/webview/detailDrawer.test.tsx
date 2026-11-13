@@ -63,9 +63,20 @@ describe("Related resources", () => {
 
   test("the drawer exposes Commands and releases its own root on close", async () => {
     const result = render(<DetailDrawer sectionId="pods" uid="p1" title="Pod web-1" onClose={vi.fn()} />);
-    await screen.findByRole("button", { name: "Commands" });
-    expect(screen.queryByRole("button", { name: "Open manifest" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Commands" }));
+    await screen.findByRole("button", { name: "Run commands" });
+    expect(screen.getByRole("tab", { name: /Related/ }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getAllByRole("tab").map((t) => t.textContent?.replace(/\d+/g, ""))).toEqual([
+      "Related",
+      "Overview",
+      "Events",
+      "Conditions",
+      "Parent",
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: "Manifest" }));
+    expect(requests("table/openManifest")).toEqual([{ sectionId: "pods", uid: "p1" }]);
+    fireEvent.click(screen.getByRole("button", { name: "Describe" }));
+    expect(requests("table/describe")).toEqual([{ sectionId: "pods", uid: "p1" }]);
+    fireEvent.click(screen.getByRole("button", { name: "Run commands" }));
     expect(requests("table/pickCommand")).toEqual([{ sectionId: "pods", uids: ["p1"] }]);
     result.unmount();
     expect(requests("table/closeRelated")).toContainEqual({ key: "table:details:p1", dispose: true });
@@ -88,7 +99,7 @@ describe("Documentation", () => {
       parents: [],
       documentation,
     });
-    render(<DetailDrawer sectionId="deployments" uid="d1" title="Deployment web" onClose={vi.fn()} />);
+    render(<DetailDrawer sectionId="deployments" uid="d1" title="Deployment web" onClose={vi.fn()} tab="overview" />);
     const link = await screen.findByRole("link", { name: "Deployment guide" });
     expect(link.getAttribute("href")).toBe(documentation.url);
     fireEvent.click(link);
@@ -109,7 +120,7 @@ describe("Documentation", () => {
         return { overview: [], yaml: "", events: [], conditions: [], related: [], parents: [], documentation };
       if (method === "table/openDocumentation") throw new Error("Browser unavailable");
     });
-    render(<DetailDrawer sectionId="deployments" uid="d1" title="Deployment web" onClose={vi.fn()} />);
+    render(<DetailDrawer sectionId="deployments" uid="d1" title="Deployment web" onClose={vi.fn()} tab="overview" />);
     fireEvent.click(await screen.findByRole("link", { name: "Deployment guide" }));
     expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Browser unavailable");
   });

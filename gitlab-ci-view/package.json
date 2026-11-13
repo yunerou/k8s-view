@@ -3,7 +3,7 @@
   "displayName": "GitLab CI View",
   "description": "Watch and control GitLab CI pipelines of every repository in the workspace: pipelines, jobs, live logs and DAG.",
   "publisher": "yunerou",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
   "icon": "resources/icons/gitlab-ci.png",

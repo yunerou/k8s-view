@@ -8,6 +8,11 @@ even minor versions (0.2.x) are stable.
 
 ### Added
 
+- **Open in New Tab** from the sidebar, editor title bar or Command Palette: open multiple instances of the same view with separate resource sessions. The new tab starts with Independent context enabled, taking the source table’s context when opened from the same view, or the shared context otherwise.
+- **Independent context** in table headers: choose a cluster and namespace per tab, including all namespaces or a manually entered namespace. Shared-context changes leave independent tabs in place; disabling the toggle follows the current shared context again. Closing the tab or reloading the window discards its private selection without changing the shared context.
+- **Pod Overview**: inspect each container’s image, declared command and arguments, and configured resource requests/limits alongside Pod identity and labels.
+- Documentation: refreshed 0.0.6 screenshots, detailed table/context/relationship workflows in the README, and a Vietnamese feature guide in `FEATURES.vi.md`.
+
 - Official Kubernetes documentation links in the detail drawer Overview for common built-in resource kinds.
 - Table: column filter expressions (`>0`, `<1h`, `>100%`, `>500m`, `>1Gi`, `!=Running`, `a|b`) in the filter row and as `column:expr` qualifiers in the search box; column filters are remembered per section.
 - Table: group by any column (e.g. Pods by Node).
@@ -15,6 +20,10 @@ even minor versions (0.2.x) are stable.
 - Commands: Open Related / Open Parent open a table tab limited to a resource's related or parent resources, updated live.
 
 ### Changed
+
+- Sidebar View section now lists views that open directly in editor tabs, replacing the resource tree.
+- Context uses VS Code Quick Picks for both cluster and namespace; cluster names wrap and appear once.
+- Detail drawer opens on Related, followed by Overview, Events, Conditions and Parent, with Describe, Manifest and Run commands actions.
 
 - Fewer watches: a table tab watches only its active section (other section tabs show data already loaded, without a count until known); the sidebar no longer watches metrics (or every Pod for Nodes) unless it sorts by a metric column; hiding the sidebar releases its watches even while a table of the same view is open.
 

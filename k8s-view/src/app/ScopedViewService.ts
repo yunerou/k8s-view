@@ -1,6 +1,7 @@
 import { inject, injectable } from "@needle-di/core";
 import type * as vscode from "vscode";
 import type { SectionConfig } from "../core/config/schema";
+import type { ClusterContext } from "../core/context/ClusterContext";
 import { kindViewConfig } from "../core/view/kindView";
 import { edgeChildKind } from "../core/view/ParentIndex";
 import type { KindKey } from "../core/view/RelationResolver";
@@ -14,6 +15,7 @@ import { ViewRegistry } from "./ViewRegistry";
 /** Open Related / Open Parent: register a dynamic view per source and direction, limited to the source's relations. */
 @injectable()
 export class ScopedViewService implements vscode.Disposable {
+  private readonly independent = new Set<string>();
   private readonly subscription: vscode.Disposable;
   private contextName: string | undefined;
 
@@ -36,10 +38,18 @@ export class ScopedViewService implements vscode.Disposable {
    * show. `children`: the source section's children when known (opened from a table), else the first section listing
    * the kind with children.
    */
-  ensure(direction: ScopeDirection, source: ScopeSource, children?: readonly ChildDefinition[]): string | undefined {
-    const id = scopedViewId(direction, source.uid);
+  ensure(
+    direction: ScopeDirection,
+    source: ScopeSource,
+    children?: readonly ChildDefinition[],
+    context?: ClusterContext,
+  ): string | undefined {
+    const id = scopedViewId(
+      direction,
+      context ? `${source.uid}.local.${Buffer.from(context.name).toString("hex")}` : source.uid,
+    );
     if (this.views.get(id)?.scope) return id;
-    const ctx = this.contexts.current;
+    const ctx = context ?? this.contexts.current;
     if (!ctx) return undefined;
     const scope: ViewScope = {
       direction,
@@ -47,8 +57,9 @@ export class ScopedViewService implements vscode.Disposable {
       context: ctx.name,
       children: direction === "related" ? (children ?? this.sourceSection(source)?.children ?? []) : [],
     };
-    const kinds = this.kinds(scope);
+    const kinds = this.kinds(scope, ctx);
     if (kinds.length === 0) return undefined;
+    if (context) this.independent.add(id);
     this.views.setDynamic(
       scopedViewConfig(
         id,
@@ -61,11 +72,12 @@ export class ScopedViewService implements vscode.Disposable {
   }
 
   remove(viewId: string): void {
+    this.independent.delete(viewId);
     if (this.views.get(viewId)?.scope) this.views.removeDynamic(viewId);
   }
 
   clear(): void {
-    for (const v of this.views.scopedViews()) this.views.removeDynamic(v.id);
+    for (const v of this.views.scopedViews()) if (!this.independent.has(v.id)) this.views.removeDynamic(v.id);
   }
 
   dispose(): void {
@@ -84,14 +96,13 @@ export class ScopedViewService implements vscode.Disposable {
   }
 
   /** Related: kinds of the children tree. Parents: ancestor kinds found now (static ones while kinds still load). */
-  private kinds(scope: ViewScope): KindKey[] {
+  private kinds(scope: ViewScope, ctx: ClusterContext): KindKey[] {
     const s = scope.source;
     const out = new Map<string, KindKey>();
     const add = (k: KindKey) => {
       const key = `${k.group}/${k.kind}`;
       if (!out.has(key) && !(k.group === s.group && k.kind === s.kind)) out.set(key, { group: k.group, kind: k.kind });
     };
-    const ctx = this.contexts.current;
     const index = this.views.parentIndex;
     const resolved = ctx ? resolveScope(scope, this.source.lookup(ctx), index, ctx.scope.type === "all") : undefined;
     if (scope.direction === "related") {

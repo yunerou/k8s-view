@@ -6,6 +6,7 @@ import { CommandExecutor } from "../../app/CommandExecutor";
 import { CommandRegistry } from "../../app/CommandRegistry";
 import { ContextService, errorMessage } from "../../app/ContextService";
 import { HotkeyService } from "../../app/HotkeyService";
+import { ClusterApi, KubeApiError } from "../../app/ports/ClusterApi";
 import { ResourceSource } from "../../app/ports/ResourceSource";
 import { Settings } from "../../app/ports/Settings";
 import { StateStore } from "../../app/ports/StateStore";
@@ -14,6 +15,7 @@ import { buildSection, diffSection, EMPTY_SNAPSHOT, type SectionSnapshot } from 
 import type { RegisteredView } from "../../app/ViewRegistry";
 import type { SectionContent, ViewSession } from "../../app/ViewSession";
 import { ViewSessionManager } from "../../app/ViewSessionManager";
+import { ClusterContext, isProtectedContext, type NamespaceScope } from "../../core/context/ClusterContext";
 import { formatAge } from "../../core/resource/format";
 import type { KubeResource } from "../../core/resource/KubeResource";
 import { resourceDocumentation } from "../../core/resource/resourceDocumentation";
@@ -72,10 +74,10 @@ function toScopeRef(scope: ViewScope): ScopeRef {
   };
 }
 
-/** Manage table tabs (one per view) and restore them after reload. */
+/** Manage table instances and restore them after reload. */
 @injectable()
 export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableWebviewState>, vscode.Disposable {
-  private readonly panels = new Map<string, TablePanel>();
+  private readonly panels = new Set<TablePanel>();
   private readonly activeChanged = new vscode.EventEmitter<void>();
   /** A table tab gained/lost focus (the hotkey status bar item appears only when needed). */
   readonly onDidChangeActive = this.activeChanged.event;
@@ -93,6 +95,7 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
     private readonly manifests = inject(ManifestDocumentProvider),
     private readonly hotkeys = inject(HotkeyService),
     private readonly scoped = inject(ScopedViewService),
+    private readonly api = inject(ClusterApi),
   ) {}
 
   /** A table tab is active. */
@@ -100,8 +103,19 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
     return [...this.panels.values()].some((p) => p.panel.active);
   }
 
-  open(viewId: string): void {
-    const existing = this.panels.get(viewId);
+  private find(viewId: string): TablePanel | undefined {
+    return [...this.panels].find((p) => p.viewId === viewId);
+  }
+
+  /** Open another instance, pinned to the active tab’s context when available. */
+  openNew(viewId?: string): void {
+    const active = [...this.panels].find((p) => p.panel.active);
+    const id = viewId ?? active?.viewId;
+    if (id) this.open(id, true, active?.viewId === id ? active.currentContext : this.contexts.current);
+  }
+
+  open(viewId: string, newTab = false, context?: ClusterContext): void {
+    const existing = !newTab && this.find(viewId);
     if (existing) {
       existing.panel.reveal();
       return;
@@ -120,12 +134,17 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
         retainContextWhenHidden: false,
       },
     );
-    this.attach(panel, viewId);
+    this.attach(panel, viewId, context);
   }
 
   /** Open Related / Open Parent tab for `source`; reveals the tab when it is already open. */
-  openScoped(direction: ScopeDirection, source: ScopeSource, children?: readonly ChildDefinition[]): boolean {
-    const viewId = this.scoped.ensure(direction, source, children);
+  openScoped(
+    direction: ScopeDirection,
+    source: ScopeSource,
+    children?: readonly ChildDefinition[],
+    context?: ClusterContext,
+  ): boolean {
+    const viewId = this.scoped.ensure(direction, source, children, context);
     if (!viewId) {
       void vscode.window.showInformationMessage(
         direction === "related"
@@ -135,6 +154,7 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
       return false;
     }
     this.open(viewId);
+    if (context) this.find(viewId)?.useContext(context);
     return true;
   }
 
@@ -173,7 +193,7 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
       this.open(viewId);
       return;
     }
-    const existing = this.panels.get(viewId);
+    const existing = this.find(viewId);
     if (existing) {
       existing.panel.reveal();
       return;
@@ -182,19 +202,18 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
       void vscode.window.showWarningMessage(vscode.l10n.t("View '{0}' is not available.", viewId));
       return;
     }
-    this.panels.delete(table.viewId);
     table.retarget(viewId);
-    this.panels.set(viewId, table);
   }
 
-  private attach(panel: vscode.WebviewPanel, viewId: string): void {
+  private attach(panel: vscode.WebviewPanel, viewId: string, context?: ClusterContext): void {
     const table = new TablePanel(panel, viewId, this.extension.extensionUri, this);
-    this.panels.set(viewId, table);
+    this.panels.add(table);
+    if (context) table.useContext(context);
     panel.onDidChangeViewState(() => this.activeChanged.fire());
     panel.onDidDispose(() => {
       table.dispose();
-      if (this.panels.get(table.viewId) === table) this.panels.delete(table.viewId);
-      this.scoped.remove(table.viewId);
+      this.panels.delete(table);
+      if (!this.find(table.viewId)) this.scoped.remove(table.viewId);
       this.activeChanged.fire();
     });
     this.activeChanged.fire();
@@ -203,6 +222,7 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
   /** Shared dependencies for each TablePanel. */
   get deps() {
     return {
+      api: this.api,
       sessions: this.sessions,
       contexts: this.contexts,
       commands: this.commands,
@@ -218,6 +238,12 @@ export class ResourceTablePanels implements vscode.WebviewPanelSerializer<TableW
 }
 
 class TablePanel implements vscode.Disposable {
+  private localContext: ClusterContext | undefined;
+  private localSession: ViewSession | undefined;
+  private readonly localChanged = new vscode.EventEmitter<ClusterContext | undefined>();
+  private get context(): ClusterContext | undefined {
+    return this.localContext ?? this.owner.deps.contexts.current;
+  }
   private readonly messenger = new Messenger();
   private readonly participant;
   private snapshots = new Map<string, SectionSnapshot>();
@@ -252,7 +278,22 @@ class TablePanel implements vscode.Disposable {
     this.participant = this.messenger.registerWebviewPanel(panel);
     const m = this.messenger;
     this.disposables.push(
-      m.onRequest(TableRequests.getViewModel, (params) => {
+      m.onRequest(TableRequests.setIndependent, ({ enabled }) => this.setIndependent(enabled)),
+      m.onRequest(TableRequests.pickContext, () => this.pickContext()),
+      m.onRequest(TableRequests.pickNamespace, () => this.pickNamespace()),
+      m.onRequest(TableRequests.describe, async (ref) => {
+        const [r] = this.resolve(ref.sectionId, [ref.uid]);
+        if (r && this.context)
+          await vscode.commands.executeCommand("k8sView.describe", {
+            context: this.context.name,
+            group: r.kind.group,
+            kind: r.kind.kind,
+            namespace: r.namespace,
+            name: r.name,
+          });
+      }),
+      m.onRequest(TableRequests.getViewModel, async (params) => {
+        await this.session?.whenReady();
         if (params?.activeSection) this.activeSection = params.activeSection;
         this.modelRequested = true;
         return this.model();
@@ -267,7 +308,11 @@ class TablePanel implements vscode.Disposable {
       m.onRequest(TableRequests.runCommand, async ({ commandId, sectionId, uids }) => {
         const command = d.commands.get(commandId);
         if (!command || !this.commandsFor(sectionId, uids).some((c) => c.id === commandId)) return "blocked";
-        return d.executor.execute(command, this.resolve(sectionId, uids));
+        return d.executor.execute(
+          command,
+          this.resolve(sectionId, uids),
+          this.context ? { context: this.context } : {},
+        );
       }),
       m.onRequest(TableRequests.details, (ref) => this.details(ref)),
       m.onRequest(TableRequests.openDocumentation, async (ref) => {
@@ -279,7 +324,7 @@ class TablePanel implements vscode.Disposable {
         const [r] = this.resolve(sectionId, [uid]);
         if (!r) return false;
         const children = direction === "related" ? this.session?.sectionDefinition(sectionId)?.children : undefined;
-        return this.owner.openScoped(direction, scopeSourceOf(r), children);
+        return this.owner.openScoped(direction, scopeSourceOf(r), children, this.localContext);
       }),
       m.onRequest(TableRequests.setScopeEnabled, ({ enabled }) => this.session?.setScopeEnabled(enabled)),
       m.onRequest(TableRequests.openScopeSource, async () => {
@@ -302,7 +347,7 @@ class TablePanel implements vscode.Disposable {
       }),
       m.onRequest(TableRequests.openManifest, async (ref) => {
         const [r] = this.resolve(ref.sectionId, [ref.uid]);
-        const ctx = d.contexts.current;
+        const ctx = this.context;
         if (r && ctx)
           await d.manifests.open({
             context: ctx.name,
@@ -341,15 +386,46 @@ class TablePanel implements vscode.Disposable {
         this.messenger.sendNotification(TableNotifications.hotkeys, this.participant, d.hotkeys.state()),
       ),
       panel.onDidChangeViewState(() => this.visibilityChanged()),
-      d.contexts.onDidChange(() => this.reset()),
+      d.settings.onDidChange(() => {
+        const ctx = this.localContext;
+        if (!ctx) return;
+        const protectedContext = isProtectedContext(ctx.name, d.settings.protectedContexts());
+        if (protectedContext === ctx.isProtected) return;
+        this.localContext = new ClusterContext(ctx.name, ctx.cluster, ctx.user, ctx.scope, protectedContext);
+        this.localChanged.fire(this.localContext);
+        this.reset();
+      }),
+      d.contexts.onDidChange(() => {
+        if (!this.localContext) {
+          this.localChanged.fire(this.context);
+          this.reset();
+        }
+      }),
       d.sessions.onDidChangeSessions(() => {
+        if (this.localSession) {
+          const view = d.sessions.session(this.viewId)?.view;
+          if (!view && scopedDirection(this.viewId)) {
+            this.panel.dispose();
+            return;
+          }
+          if (view && view !== this.localSession.view) {
+            this.localSession.update(view);
+            this.reset();
+          }
+          return;
+        }
         const session = this.session;
         if (session !== this.bound.session || session?.view !== this.bound.view) this.reset();
       }),
     );
+    this.createLocalSession();
     this.bind();
     this.subscribeSession();
     this.visibilityChanged();
+  }
+
+  get currentContext(): ClusterContext | undefined {
+    return this.context;
   }
 
   get viewId(): string {
@@ -357,14 +433,127 @@ class TablePanel implements vscode.Disposable {
   }
 
   private get session(): ViewSession | undefined {
-    return this.owner.deps.sessions.session(this.viewId);
+    return this.localSession ?? this.owner.deps.sessions.session(this.viewId);
+  }
+
+  useContext(context: ClusterContext): void {
+    this.closeSections();
+    this.setVisible(false);
+    this.localContext = context;
+    if (!this.localSession) this.createLocalSession();
+    this.setVisible(this.panel.visible);
+    this.localChanged.fire(context);
+    this.reset();
+  }
+
+  private setVisible(visible: boolean): void {
+    if (this.localSession) this.localSession.setVisible("table", visible);
+    else this.owner.deps.sessions.setTableVisible(this.viewId, visible);
+  }
+
+  private createLocalSession(): void {
+    const self = this;
+    this.localSession = this.owner.deps.sessions.createIndependent(this.viewId, {
+      get current() {
+        return self.context;
+      },
+      onDidChange: this.localChanged.event,
+    });
+    this.setVisible(this.panel.visible);
+  }
+
+  private setIndependent(enabled: boolean): void {
+    if (enabled === !!this.localContext) return;
+    if (enabled && !this.context) return;
+    this.closeSections();
+    this.setVisible(false);
+    if (enabled) {
+      this.localContext = this.context;
+      this.localSession?.dispose();
+      this.createLocalSession();
+    } else {
+      this.localSession?.dispose();
+      this.localSession = undefined;
+      this.localContext = undefined;
+      this.createLocalSession();
+    }
+    this.reset();
+  }
+
+  private async pickContext(): Promise<void> {
+    if (!this.localContext) return;
+    const previous = this.context;
+    const picked = await vscode.window.showQuickPick(
+      this.owner.deps.contexts.contexts().map((c) => ({ label: c.name, info: c })),
+      { title: vscode.l10n.t("Cluster for this tab") },
+    );
+    if (!picked || !this.localContext || previous !== this.context) return;
+    const c = picked.info;
+    this.closeSections();
+    this.localContext = new ClusterContext(
+      c.name,
+      c.cluster,
+      c.user,
+      c.namespace ? { type: "single", name: c.namespace } : { type: "all" },
+      isProtectedContext(c.name, this.owner.deps.settings.protectedContexts()),
+    );
+    this.localChanged.fire(this.localContext);
+    this.reset();
+  }
+
+  private async selectNamespace(scope: NamespaceScope): Promise<void> {
+    if (!this.localContext) return this.owner.deps.contexts.selectNamespace(scope);
+    this.closeSections();
+    this.localContext = this.localContext!.withScope(scope);
+    this.localChanged.fire(this.localContext);
+    this.reset();
+  }
+
+  private async pickNamespace(): Promise<void> {
+    if (!this.localContext) {
+      await vscode.commands.executeCommand("k8sView.selectNamespace");
+      return;
+    }
+    const ctx = this.context;
+    if (!ctx) return;
+    let names: string[] = [];
+    try {
+      names = await this.owner.deps.api.listNamespaces(ctx.name);
+    } catch (error) {
+      if (!KubeApiError.isForbidden(error)) throw error;
+    }
+    const picked = await vscode.window.showQuickPick(
+      [
+        { label: vscode.l10n.t("All namespaces"), scope: { type: "all" } as NamespaceScope },
+        ...names.sort().map((name) => ({ label: name, scope: { type: "single", name } as NamespaceScope })),
+        { label: vscode.l10n.t("Enter namespace…"), scope: undefined },
+      ],
+      { title: vscode.l10n.t("Namespace for this tab") },
+    );
+    if (!picked || this.context !== ctx || !this.localContext) return;
+    let scope = picked.scope;
+    if (!scope) {
+      const name = await vscode.window.showInputBox({
+        title: vscode.l10n.t("Namespace"),
+        validateInput: (v) =>
+          /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(v) && v.length <= 63
+            ? undefined
+            : vscode.l10n.t("Enter a valid namespace"),
+      });
+      if (!name || this.context !== ctx || !this.localContext) return;
+      scope = { type: "single", name };
+    }
+    await this.selectNamespace(scope);
   }
 
   /** Switch a tab's view: release the old view's leases, then send a new model (the webview discards old view preferences). */
   retarget(viewId: string): void {
     this.closeSections();
-    this.owner.deps.sessions.setTableVisible(this.viewId, false);
+    this.setVisible(false);
+    this.localSession?.dispose();
+    this.localSession = undefined;
     this.currentViewId = viewId;
+    this.createLocalSession();
     this.activeSection = undefined;
     this.dirty = false;
     this.visibilityChanged();
@@ -378,23 +567,27 @@ class TablePanel implements vscode.Disposable {
       const viewId = d.settings.favoriteViews()[action.favorite - 1];
       if (viewId) this.owner.switchView(this, viewId);
       else void this.noFavorite(action.favorite);
-    } else if ("allNamespaces" in action) await d.contexts.selectNamespace({ type: "all" });
-    else if ("namespace" in action) await d.contexts.selectNamespace({ type: "single", name: action.namespace });
+    } else if ("allNamespaces" in action) await this.selectNamespace({ type: "all" });
+    else if ("namespace" in action) await this.selectNamespace({ type: "single", name: action.namespace });
     else if ("command" in action) {
       const command = d.commands.get(action.command);
       if (!command) {
         void vscode.window.showWarningMessage(vscode.l10n.t("Unknown command '{0}'", action.command));
         return;
       }
-      await d.executor.execute(command, this.resolve(sectionId, uids));
+      await d.executor.execute(command, this.resolve(sectionId, uids), this.context ? { context: this.context } : {});
     } else if (action.action === "runLast") {
       if (!d.executor.lastRun) {
         void vscode.window.showInformationMessage(vscode.l10n.t("No command has been run yet."));
         return;
       }
       const targets = this.resolve(sectionId, uids);
-      await d.executor.runLast(targets.length > 0 ? targets : undefined);
-    } else if (action.action === "pickNamespace") await vscode.commands.executeCommand("k8sView.selectNamespace");
+      await d.executor.execute(
+        d.executor.lastRun.command,
+        targets.length > 0 ? targets : d.executor.lastRun.targets,
+        this.context ? { context: this.context } : {},
+      );
+    } else if (action.action === "pickNamespace") await this.pickNamespace();
     else if (action.action === "pickView") {
       const favorites = d.settings.favoriteViews();
       const picked = await vscode.window.showQuickPick(
@@ -428,7 +621,9 @@ class TablePanel implements vscode.Disposable {
 
   dispose(): void {
     this.closeSections();
-    this.owner.deps.sessions.setTableVisible(this.viewId, false);
+    this.setVisible(false);
+    this.localSession?.dispose();
+    this.localChanged.dispose();
     for (const d of this.disposables) d.dispose();
   }
 
@@ -448,7 +643,7 @@ class TablePanel implements vscode.Disposable {
 
   private visibilityChanged(): void {
     const visible = this.panel.visible;
-    this.owner.deps.sessions.setTableVisible(this.viewId, visible);
+    this.setVisible(visible);
     if (!visible) {
       this.closeSections();
       return;
@@ -465,7 +660,7 @@ class TablePanel implements vscode.Disposable {
 
   private model(): TableViewModel {
     const session = this.session;
-    const ctx = this.owner.deps.contexts.current;
+    const ctx = this.context;
     const now = Date.now();
     this.snapshots = new Map();
     this.resources = new Map();
@@ -487,6 +682,7 @@ class TablePanel implements vscode.Disposable {
       title: session?.definition.title ?? this.viewId,
       context: ctx?.name,
       namespaceScope: ctx?.scope,
+      independent: !!this.localContext,
       ...(scope && scopeState ? { scope: { ...toScopeRef(scope), ...scopeState } } : {}),
       sections,
       prefs: this.owner.deps.state.getWorkspace<Record<string, SectionPrefs>>(prefsKey(this.viewId)) ?? {},
@@ -504,7 +700,7 @@ class TablePanel implements vscode.Disposable {
     this.bind();
     this.subscribeSession();
     const session = this.session;
-    if (session) this.panel.title = `${session.definition.title} · table`;
+    if (session) this.panel.title = `${session.definition.title} · ${this.localContext?.name ?? "table"}`;
     if (!this.panel.visible) {
       this.dirty = true;
       return;
@@ -520,7 +716,7 @@ class TablePanel implements vscode.Disposable {
       this.dirty = true;
       return;
     }
-    const ctx = this.owner.deps.contexts.current;
+    const ctx = this.context;
     if (this.detailsKey)
       this.messenger.sendNotification(TableNotifications.relatedChanged, this.participant, undefined);
     const now = Date.now();
@@ -577,7 +773,7 @@ class TablePanel implements vscode.Disposable {
   }
 
   private async pickCommand(sectionId: string, uids: readonly string[]): Promise<"details" | undefined> {
-    const context = this.owner.deps.contexts.current;
+    const context = this.context;
     const commands = this.commandsFor(sectionId, uids);
     const items: (vscode.QuickPickItem & { action?: string })[] = [];
     if (uids.length === 1 && this.resolve(sectionId, uids).length === 1)
@@ -603,11 +799,16 @@ class TablePanel implements vscode.Disposable {
       title: uids.length > 1 ? vscode.l10n.t("Batch Commands ({0} resources)", uids.length) : vscode.l10n.t("Commands"),
       matchOnDescription: true,
     });
-    if (!picked?.action || context !== this.owner.deps.contexts.current) return undefined;
+    if (!picked?.action || context !== this.context) return undefined;
     if (picked.action === "details") return "details";
     const current = this.commandsFor(sectionId, uids).find((c) => `command:${c.id}` === picked.action);
     const command = current && !current.blocked ? this.owner.deps.commands.get(current.id) : undefined;
-    if (command) await this.owner.deps.executor.execute(command, this.resolve(sectionId, uids));
+    if (command)
+      await this.owner.deps.executor.execute(
+        command,
+        this.resolve(sectionId, uids),
+        this.context ? { context: this.context } : {},
+      );
     return undefined;
   }
 
@@ -622,7 +823,7 @@ class TablePanel implements vscode.Disposable {
 
   /** Latest copy of `r` from the store (relations are re-read on live updates). */
   private fresh(r: KubeResource): KubeResource {
-    const ctx = this.owner.deps.contexts.current;
+    const ctx = this.context;
     if (!ctx) return r;
     return (
       this.owner.deps.source
@@ -677,7 +878,7 @@ class TablePanel implements vscode.Disposable {
     const node = this.relatedNodes.get(key);
     const session = this.session;
     if (!node || !session) return [];
-    const ctx = this.owner.deps.contexts.current;
+    const ctx = this.context;
     if (!ctx) return [];
     const resource = this.fresh(node.resource);
     const retained = new Set<string>();
@@ -730,7 +931,7 @@ class TablePanel implements vscode.Disposable {
     const d = this.owner.deps;
     const session = this.session;
     const [r] = this.resolve(ref.sectionId, [ref.uid]);
-    const ctx = d.contexts.current;
+    const ctx = this.context;
     if (!r || !session || !ctx) return { overview: [], yaml: "", events: [], conditions: [], related: [], parents: [] };
     const section = session.sectionDefinition(ref.sectionId);
     const status = section?.status(r);
@@ -776,6 +977,31 @@ class TablePanel implements vscode.Disposable {
     return {
       ...(documentationUrl ? { documentation: { kind: r.kind.kind, url: documentationUrl } } : {}),
       overview,
+      ...(r.kind.kind === "Pod" && r.kind.group === ""
+        ? {
+            containers: (
+              (
+                r.object["spec"] as
+                  | {
+                      containers?: {
+                        name: string;
+                        image?: string;
+                        command?: string[];
+                        args?: string[];
+                        resources?: Record<string, unknown>;
+                      }[];
+                    }
+                  | undefined
+              )?.containers ?? []
+            ).map((c) => ({
+              name: c.name,
+              image: c.image ?? "",
+              command: c.command ?? [],
+              args: c.args ?? [],
+              resources: c.resources ?? {},
+            })),
+          }
+        : {}),
       yaml: stringify(r.object, { lineWidth: 0 }),
       events,
       conditions: r.conditions.map((c) => ({ ...c })),

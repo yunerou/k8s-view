@@ -33,38 +33,25 @@ describe("ContextApp", () => {
     expect(requests("context/pickContext")).toHaveLength(1);
   });
 
-  test("namespace selector offers All namespaces and refresh", async () => {
+  test("namespace opens the VS Code picker and reflects the selected scope", async () => {
     await renderPanel();
-    const ns = screen.getByRole("combobox", { name: "Namespace" });
-    expect(
-      within(ns)
-        .getAllByRole("option")
-        .map((o) => o.textContent),
-    ).toEqual(["All namespaces", "default", "kube-system"]);
-    fireEvent.change(ns, { target: { value: "kube-system" } });
-    expect(requests("context/selectNamespace")).toEqual([{ scope: { type: "single", name: "kube-system" } }]);
-    notify("context/state", { ...state, scope: { type: "single", name: "kube-system" } });
-    fireEvent.change(ns, { target: { value: "*" } });
-    expect(requests("context/selectNamespace")[1]).toEqual({ scope: { type: "all" } });
-    fireEvent.click(screen.getByRole("button", { name: "Refresh namespaces" }));
-    expect(requests("context/refreshNamespaces")).toHaveLength(1);
+    expect(screen.queryByRole("combobox", { name: "Namespace" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Namespace" }));
+    expect(requests("context/pickNamespace")).toHaveLength(1);
+    notify("context/state", { ...state, scope: { type: "single", name: "team-a" } });
+    expect(screen.getByRole("button", { name: "Namespace" }).textContent).toContain("team-a");
   });
 
-  test("allows typing a namespace when listing is forbidden", async () => {
+  test("namespace picker remains available when listing is forbidden", async () => {
     state = contextState({ namespacesForbidden: true, namespaces: [] });
     await renderPanel();
-    expect(screen.getByText(/cannot list namespaces/i)).toBeTruthy();
-    const input = screen.getByRole("textbox", { name: "Namespace name" });
-    fireEvent.input(input, { target: { value: "Bad_NS" } });
-    expect(screen.getByRole("button", { name: "Apply" }).hasAttribute("disabled")).toBe(true);
-    fireEvent.input(input, { target: { value: "team-a" } });
-    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
-    expect(requests("context/selectNamespace")).toEqual([{ scope: { type: "single", name: "team-a" } }]);
+    fireEvent.click(screen.getByRole("button", { name: "Namespace" }));
+    expect(requests("context/pickNamespace")).toHaveLength(1);
   });
 
   test("cluster and namespace share the picker block", async () => {
     const cluster = await renderPanel();
-    const ns = screen.getByRole("combobox", { name: "Namespace" });
+    const ns = screen.getByRole("button", { name: "Namespace" });
     const row = cluster.closest(".picker-row");
     expect(row).toBeTruthy();
     expect(row?.contains(ns)).toBe(true);

@@ -33,6 +33,11 @@ export class ContextViewProvider implements vscode.WebviewViewProvider, vscode.D
           await vscode.commands.executeCommand("k8sView.selectContext", { namespaceStep: false });
         }),
       ),
+      m.onRequest(ContextRequests.pickNamespace, () =>
+        this.guard(async () => {
+          await vscode.commands.executeCommand("k8sView.selectNamespace");
+        }),
+      ),
       m.onRequest(ContextRequests.selectNamespace, ({ scope }) =>
         this.guard(() => this.contexts.selectNamespace(scope)),
       ),

@@ -9,7 +9,6 @@ import {
 import { Banner } from "../components/Banner";
 import { Codicon } from "../components/Codicon";
 import { ConnectionLine, WatchLine } from "../components/ConnectionStatus";
-import { NamespacePicker } from "../components/NamespacePicker";
 import { RefreshControl } from "../components/RefreshControl";
 import { errorMessage, useNotification } from "../shared/hooks";
 import { request } from "../shared/messenger";
@@ -87,21 +86,30 @@ export function ContextApp() {
               <Codicon name="server-environment" />
               <span className="cluster-button-text">
                 <span className="cluster-name">{selected ? contextLabel(selected) : l10n.t("Select cluster…")}</span>
-                {selected && <span className="cluster-detail">{`${selected.cluster} · ${selected.user}`}</span>}
               </span>
               <Codicon name="chevron-down" />
             </button>
           )}
         </div>
 
-        <NamespacePicker
-          scope={state.scope}
-          namespaces={state.namespaces}
-          forbidden={state.namespacesForbidden}
-          disabled={noContext}
-          onSelect={(scope) => request(ContextRequests.selectNamespace, { scope }).catch(report)}
-          onRefresh={() => request(ContextRequests.refreshNamespaces).catch(report)}
-        />
+        <div className="field">
+          <label className="field-label" htmlFor="namespace-select">
+            {l10n.t("Namespace")}
+          </label>
+          <button
+            type="button"
+            id="namespace-select"
+            className="cluster-button"
+            disabled={noContext}
+            onClick={() => request(ContextRequests.pickNamespace).catch(report)}
+          >
+            <Codicon name="symbol-namespace" />
+            <span className="cluster-name">
+              {state.scope?.type === "single" ? state.scope.name : l10n.t("All namespaces")}
+            </span>
+            <Codicon name="chevron-down" />
+          </button>
+        </div>
       </div>
 
       {!noContext && (

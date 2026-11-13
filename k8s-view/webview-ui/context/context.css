@@ -67,6 +67,9 @@ body {
 }
 
 .cluster-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--vscode-font-size);
   overflow-wrap: anywhere;
 }
 
@@ -205,4 +208,12 @@ body {
 .segment:has(input:focus-visible) {
   outline: 1px solid var(--vscode-focusBorder);
   outline-offset: -1px;
+}
+
+.cluster-button > .codicon {
+  flex-shrink: 0;
+}
+.cluster-button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

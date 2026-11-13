@@ -625,3 +625,34 @@ body {
 .resource-warning {
   flex: none;
 }
+
+.table-context {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+.table-context .toolbar-button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.table-context [role="switch"][aria-checked="true"] {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+.drawer-header {
+  flex-wrap: wrap;
+}
+.drawer-title {
+  flex-basis: 100%;
+}
+.container-overview h3 {
+  margin: 16px 0 8px;
+  font-size: inherit;
+}
+.container-overview pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+}

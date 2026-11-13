@@ -3,7 +3,7 @@
     "displayName": "K8s View",
     "description": "Custom Kubernetes views with auto refresh, resource-bound commands, colored multi-pod logs and parameterized snippets, defined in JSON.",
     "publisher": "yunerou",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "private": true,
     "license": "MIT",
     "icon": "resources/icons/k8s-view.png",
@@ -387,6 +387,12 @@
                 "title": "Reveal value",
                 "category": "K8s View",
                 "icon": "$(eye)"
+            },
+            {
+                "command": "k8sView.openTableInNewTab",
+                "title": "Open in New Tab",
+                "category": "K8s View",
+                "icon": "$(new-window)"
             }
         ],
         "menus": {
@@ -510,11 +516,6 @@
             ],
             "view/title": [
                 {
-                    "command": "k8sView.selectKind",
-                    "group": "navigation@0",
-                    "when": "view == k8sView.view && k8sView.activeView == kind"
-                },
-                {
                     "command": "k8sView.switchView",
                     "group": "navigation@0",
                     "when": "view == k8sView.view"
@@ -522,22 +523,22 @@
                 {
                     "command": "k8sView.refresh",
                     "group": "navigation@1",
-                    "when": "view =~ /^k8sView\\./ && view != k8sView.context"
+                    "when": "view =~ /^k8sView\\./ && view != k8sView.context && view != k8sView.view"
                 },
                 {
                     "command": "k8sView.pause",
                     "group": "navigation@2",
-                    "when": "view =~ /^k8sView\\./ && view != k8sView.context && !k8sView.paused"
+                    "when": "view =~ /^k8sView\\./ && view != k8sView.context && !k8sView.paused && view != k8sView.view"
                 },
                 {
                     "command": "k8sView.resume",
                     "group": "navigation@2",
-                    "when": "view =~ /^k8sView\\./ && view != k8sView.context && k8sView.paused"
+                    "when": "view =~ /^k8sView\\./ && view != k8sView.context && k8sView.paused && view != k8sView.view"
                 },
                 {
                     "command": "k8sView.openTable",
                     "group": "navigation@3",
-                    "when": "view =~ /^k8sView\\./ && view != k8sView.context"
+                    "when": "view =~ /^k8sView\\./ && view != k8sView.context && view != k8sView.view"
                 },
                 {
                     "command": "k8sView.editViewConfig",
@@ -755,6 +756,18 @@
                     "command": "k8sView.deleteSnippet",
                     "group": "2_edit@2",
                     "when": "view == k8sView.snippets && viewItem =~ /^k8sview\\.snippet:(user|workspace)$/"
+                },
+                {
+                    "command": "k8sView.openTableInNewTab",
+                    "when": "view == k8sView.view",
+                    "group": "1_open"
+                }
+            ],
+            "editor/title": [
+                {
+                    "command": "k8sView.openTableInNewTab",
+                    "when": "activeWebviewPanelId == k8sView.table",
+                    "group": "navigation"
                 }
             ]
         },
